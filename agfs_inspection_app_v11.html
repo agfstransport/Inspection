@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AGFS Vehicle Inspection</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#12121A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AGFS Inspect">
+<style>
+:root{
+  --ink:#12121A; --ink-soft:#5A6472; --paper:#F5F6F8; --card:#FFFFFF;
+  --line:#E1E4E9; --amber:#E31C79; --amber-dark:#B0125C;
+  --pass:#2E7D46; --pass-bg:#E7F4EB; --fail:#C0392B; --fail-bg:#FBEAE8;
+  --accent:#1B2430;
+  --font: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);font-family:var(--font);color:var(--ink);padding-bottom:40px;}
+.app-header{
+  background:var(--ink); color:#fff; padding:16px 18px; display:flex; justify-content:space-between; align-items:center;
+  position:sticky; top:0; z-index:20;
+}
+.app-header .title{font-size:15px; font-weight:700; letter-spacing:-0.01em;}
+.app-header .sub{font-size:11px; color:#B6BCC6; margin-top:2px;}
+.tabbar{display:flex; gap:0; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:58px; z-index:19;}
+.tab{flex:1; text-align:center; padding:12px 6px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-bottom:3px solid transparent;}
+.tab.active{color:var(--ink); border-bottom-color:var(--amber);}
+.tab-badge{background:var(--amber); color:#fff; font-size:10px; font-weight:800; padding:1px 7px; border-radius:10px; margin-left:4px; vertical-align:middle;}
+.wrap{max-width:720px; margin:0 auto; padding:16px;}
+.hidden{display:none !important;}
+
+/* KPI tiles */
+.kpi-row{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:16px;}
+.kpi{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 10px; text-align:center;}
+.kpi .num{font-size:20px; font-weight:800; font-family:var(--mono);}
+.kpi .lbl{font-size:10px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
+@media(max-width:480px){ .kpi-row{grid-template-columns:repeat(3,1fr);} }
+
+.newbtn{
+  display:block; width:100%; background:var(--amber); color:#fff; border:none; border-radius:8px;
+  padding:14px; font-size:14.5px; font-weight:700; cursor:pointer; margin-bottom:16px;
+}
+.newbtn:active{transform:scale(0.99);}
+
+.filters{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+.filters input[type=text]{flex:1; min-width:140px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
+.chip{padding:8px 12px; border-radius:20px; border:1px solid var(--line); background:var(--card); font-size:12px; font-weight:600; cursor:pointer; color:var(--ink-soft);}
+.chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+.insp-card{
+  background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px;
+  display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer;
+}
+.insp-card:hover{border-color:var(--amber);}
+.insp-card .left{flex:1; min-width:0;}
+.insp-card .veh{font-weight:700; font-size:14px;}
+.insp-card .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+.card-dl-btn{border:1px solid var(--line); background:var(--card); border-radius:6px; width:32px; height:32px; font-size:14px; cursor:pointer; color:var(--ink); flex-shrink:0;}
+.card-dl-btn:hover{border-color:var(--amber); background:var(--paper);}
+.badge{font-size:11px; font-weight:700; padding:4px 9px; border-radius:12px; white-space:nowrap;}
+.badge.ok{background:var(--pass-bg); color:var(--pass);}
+.badge.bad{background:var(--fail-bg); color:var(--fail);}
+.empty-state{text-align:center; padding:40px 10px; color:var(--ink-soft); font-size:13px;}
+
+/* Wizard */
+.progress-wrap{padding:12px 16px 0;}
+.progress-bar{height:5px; background:var(--line); border-radius:3px; overflow:hidden;}
+.progress-fill{height:100%; background:var(--amber); transition:width .2s;}
+.step-label{font-size:11px; color:var(--ink-soft); margin:6px 0 2px; text-transform:uppercase; letter-spacing:.05em; font-weight:700;}
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px; margin-bottom:14px;}
+.card h2{font-size:15px; margin:0 0 14px;}
+.field{margin-bottom:12px;}
+.field label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700; margin-bottom:5px;}
+.field input, .field select, .field textarea{
+  width:100%; border:1px solid var(--line); border-radius:6px; padding:9px 10px; font-size:14px; font-family:var(--font); color:var(--ink);
+}
+.field textarea{min-height:70px; resize:vertical;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+@media(max-width:480px){ .row2{grid-template-columns:1fr;} }
+.radio-inline{display:flex; gap:14px; align-items:center; padding-top:4px;}
+.radio-inline label{display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600; color:var(--ink); text-transform:none;}
+
+.qitem{border-bottom:1px solid var(--line); padding:12px 0;}
+.qitem:last-child{border-bottom:none;}
+
+.checklist-2col{column-count:2; column-gap:28px;}
+.checklist-2col .qitem{break-inside:avoid; -webkit-column-break-inside:avoid;}
+@media(max-width:640px){ .checklist-2col{column-count:1;} }
+.qtext{font-size:13.5px; margin-bottom:8px; line-height:1.4;}
+.qtext-ar{font-size:12.5px; margin:-4px 0 8px; line-height:1.6; color:var(--ink-soft); font-family:"Segoe UI", Tahoma, Arial, sans-serif;}
+.yn-group{display:flex; gap:8px; margin-bottom:8px;}
+.yn-btn{flex:1; border:1px solid var(--line); background:var(--card); border-radius:6px; padding:9px; font-size:12.5px; font-weight:700; cursor:pointer; color:var(--ink);}
+.yn-btn.y.active{background:var(--pass-bg); border-color:var(--pass); color:var(--pass);}
+.yn-btn.n.active{background:var(--fail-bg); border-color:var(--fail); color:var(--fail);}
+.qitem input[type=text]{width:100%; border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:12.5px;}
+
+.photo-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px;}
+.photo-slot{aspect-ratio:1; border:1.5px dashed var(--line); border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; background:var(--paper);}
+.photo-slot img{width:100%; height:100%; object-fit:cover;}
+.photo-slot .rm{position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;}
+.photo-slot label{font-size:24px; color:var(--ink-soft); cursor:pointer;}
+.photo-slot input{display:none;}
+
+.wizard-nav{display:flex; gap:10px; padding:6px 0 20px;}
+.wizard-nav button{flex:1; padding:13px; border-radius:8px; font-size:14px; font-weight:700; border:1px solid var(--line); background:var(--card); cursor:pointer; color:var(--ink);}
+.wizard-nav button.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+.wizard-nav button.submit{background:var(--amber); color:#fff; border-color:var(--amber);}
+
+.review-row{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); font-size:13px;}
+.review-row:last-child{border-bottom:none;}
+.review-row .k{color:var(--ink-soft);}
+.review-row .v{font-weight:600; text-align:right;}
+
+/* Detail modal */
+.modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50; display:flex; align-items:flex-end; justify-content:center;}
+.modal-sheet{background:var(--card); width:100%; max-width:720px; max-height:88vh; overflow-y:auto; border-radius:14px 14px 0 0; padding:20px;}
+.modal-close{float:right; border:none; background:none; font-size:22px; cursor:pointer; color:var(--ink-soft);}
+.section-head{font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--amber-dark); margin:16px 0 6px;}
+.detail-row{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--line); font-size:13px;}
+.detail-row .q{flex:1;}
+.detail-row .a{font-weight:700; white-space:nowrap;}
+.detail-row .a.y{color:var(--pass);}
+.detail-row .a.n{color:var(--fail);}
+.status-msg{text-align:center; font-size:13px; font-weight:700; padding:10px; min-height:20px;}
+.photo-links a{display:inline-block; margin-right:10px; font-size:12.5px; color:var(--ink); text-decoration:underline;}
+
+#printReportArea{display:none;}
+
+:root{ --pr-purple:#4B2C6F; --pr-band:#6E5A52; }
+.pr-page{ font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; }
+.pr-topbar{ display:flex; border:1px solid #333; }
+.pr-topbar .pr-brand{ flex:1.4; padding:8px 12px; border-right:1px solid #333; }
+.pr-topbar .pr-brand .pr-company{ color:#8B1A2B; font-weight:800; font-size:13px; }
+.pr-topbar .pr-brand .pr-division{ color:#555; font-size:10px; font-style:italic; }
+.pr-topbar .pr-titlebox{ flex:2.4; display:flex; align-items:center; justify-content:center; border-right:1px solid #333; }
+.pr-topbar .pr-titlebox h1{ font-size:18px; margin:0; }
+.pr-topbar .pr-logobox{ flex:1.4; display:flex; align-items:center; justify-content:center; color:#999; font-size:10px; font-style:italic; }
+
+.pr-bar3{ display:flex; background:var(--pr-purple); color:#fff; border:1px solid #333; border-top:none; font-size:10.5px; }
+.pr-bar3 > div{ flex:1; padding:5px 8px; border-right:1px solid rgba(255,255,255,.35); }
+.pr-bar3 > div:last-child{ border-right:none; }
+.pr-bar3 .pr-lbl{ font-weight:700; margin-right:6px; }
+.pr-bar3 .pr-val{ border-bottom:1px solid rgba(255,255,255,.6); display:inline-block; min-width:60%; }
+
+table.pr-info2{ width:100%; border-collapse:collapse; font-size:10.5px; margin-top:-1px; }
+table.pr-info2 th{ background:var(--pr-purple); color:#fff; text-align:left; padding:5px 8px; border:1px solid #333; font-size:10.5px; }
+table.pr-info2 td{ border:1px solid #333; padding:5px 8px; vertical-align:top; }
+table.pr-info2 td.pr-k{ width:38%; }
+
+table.pr-check{ width:100%; border-collapse:collapse; font-size:10px; margin-top:-1px; }
+table.pr-check th{ background:var(--pr-purple); color:#fff; padding:5px 6px; border:1px solid #333; text-align:left; }
+table.pr-check td{ border:1px solid #333; padding:4px 6px; vertical-align:top; }
+table.pr-check td.pr-sr{ width:3%; text-align:center; }
+table.pr-check td.pr-pts{ width:55%; }
+table.pr-check td.pr-yn{ width:6%; text-align:center; }
+table.pr-check td.pr-rmk{ width:20%; }
+tr.pr-band td{ background:var(--pr-band); color:#fff; font-weight:700; text-align:center; padding:5px; }
+.pr-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; border:1.4px solid #333; }
+.pr-dot.on{ background:#2255cc; border-color:#2255cc; }
+.pr-mark{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1.4px solid #999; font-size:11px; font-weight:800; line-height:1; }
+.pr-mark.yes{ border-color:#2E7D46; color:#2E7D46; }
+.pr-mark.no{ border-color:#C0392B; color:#C0392B; }
+tr.pr-fail td{ background:#FBEAE8; }
+
+.pr-comment-row td{ padding:8px; font-size:10.5px; }
+.pr-oc-row td{ padding:6px 8px; font-size:10.5px; }
+.pr-oc-opt{ display:inline-flex; align-items:center; gap:5px; margin-right:18px; }
+
+.pr-footer{ display:flex; justify-content:space-between; font-size:8.5px; color:#666; margin-top:8px; padding-top:4px; border-top:1px solid #ccc; }
+
+@media print{
+  body.printing-report > *:not(#printReportArea){ display:none !important; }
+  body.printing-report #printReportArea{ display:block !important; padding:14px; }
+  @page{ size:A4; margin:10mm; }
+}
+
+.combo-wrap{position:relative;}
+.combo-list{
+  position:absolute; top:calc(100% + 3px); left:0; right:0; background:var(--card);
+  border:1px solid var(--line); border-radius:8px; max-height:220px; overflow-y:auto;
+  z-index:30; box-shadow:0 4px 14px rgba(27,36,48,.12); display:none;
+}
+.combo-list.show{display:block;}
+.combo-item{padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:13px;}
+.combo-item:last-child{border-bottom:none;}
+.combo-item:hover, .combo-item.hl{background:var(--paper);}
+.combo-item .primary{font-weight:700;}
+.combo-item .secondary{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+.combo-empty{padding:10px 12px; font-size:12.5px; color:var(--ink-soft);}
+.autofill-tag{display:inline-block; font-size:10px; font-weight:700; color:var(--pass); background:var(--pass-bg); padding:2px 6px; border-radius:8px; margin-left:6px;}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div>
+    <div class="title">AGFS Vehicle Inspection</div>
+    <div class="sub">Fleet & Transport Operations</div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="tab active" id="tabDashboard" onclick="showView('dashboard')">Dashboard <span id="tabCountBadge" class="tab-badge"></span></div>
+  <div class="tab" id="tabWizard" onclick="showView('wizard')">New Inspection</div>
+</div>
+
+<!-- ============= DASHBOARD ============= -->
+<div class="wrap" id="dashboardView">
+  <div class="kpi-row">
+    <div class="kpi"><div class="num" id="kpiTotal">0</div><div class="lbl">Total</div></div>
+    <div class="kpi"><div class="num" id="kpiWeek">0</div><div class="lbl">This Week</div></div>
+    <div class="kpi"><div class="num" id="kpiPassed" style="color:var(--pass);">0</div><div class="lbl">Passed</div></div>
+    <div class="kpi"><div class="num" id="kpiFlagged" style="color:var(--fail);">0</div><div class="lbl">Flagged</div></div>
+    <div class="kpi"><div class="num" id="kpiVehicles">0</div><div class="lbl">Vehicles</div></div>
+  </div>
+
+  <button class="newbtn" onclick="showView('wizard')">+ New Inspection</button>
+
+  <div class="filters">
+    <input type="text" id="searchBox" placeholder="Search vehicle, driver, site..." oninput="renderList()">
+  </div>
+  <div class="filters">
+    <div class="field" style="flex:1;"><label>From</label><input type="date" id="dateFrom" onchange="renderList()"></div>
+    <div class="field" style="flex:1;"><label>To</label><input type="date" id="dateTo" onchange="renderList()"></div>
+    <div class="field" style="flex:0; align-self:flex-end;"><button class="chip" style="white-space:nowrap;" onclick="clearDateRange()">Clear</button></div>
+  </div>
+  <div class="filters">
+    <div class="chip active" data-f="all" onclick="setFilter('all')">All</div>
+    <div class="chip" data-f="flagged" onclick="setFilter('flagged')">Flagged</div>
+    <div class="chip" data-f="ok" onclick="setFilter('ok')">Passed</div>
+  </div>
+
+  <div id="statusLine" class="status-msg"></div>
+  <div id="listContainer"></div>
+</div>
+
+<!-- ============= WIZARD ============= -->
+<div class="wrap hidden" id="wizardView">
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:16.6%"></div></div>
+    <div class="step-label" id="stepLabel">Step 1 of 6 — Vehicle & Site Info</div>
+  </div>
+
+  <!-- Step 0: Info -->
+  <div class="step" data-step="0">
+    <div class="card">
+      <h2>Vehicle & Site Information</h2>
+      <div class="row2">
+        <div class="field"><label>Vehicle Reg. Details <span id="vehAutofillTag"></span></label>
+          <div class="combo-wrap">
+            <input type="text" id="veh_reg" placeholder="Type plate no. to search Fleet Master..." autocomplete="off">
+            <div class="combo-list" id="vehComboList"></div>
+          </div>
+        </div>
+        <div class="field"><label>Category</label><input type="text" id="v_sc" placeholder="Auto-fills from Fleet Master"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Site / Location</label><input type="text" id="site_loc"></div>
+        <div class="field"><label>Emirate / Region</label><input type="text" id="region"></div>
+      </div>
+      <div class="field"><label>Date</label><input type="date" id="date_today"></div>
+
+      <div class="field">
+        <label>Vehicle Own / Rental <span id="vehOwnTag"></span></label>
+        <input type="text" id="veh_b" placeholder="Auto-fills from Fleet Master">
+        <input type="text" id="veh_b_txt" placeholder="Rental/owner company name (if applicable)" style="margin-top:6px;">
+      </div>
+
+      <div class="row2">
+        <div class="field"><label>Make</label><input type="text" id="v_make"></div>
+        <div class="field"><label>Make Year</label><input type="text" id="v_make_year" placeholder="Auto-fills from Fleet Master"></div>
+      </div>
+      <div class="field"><label>Mileage (KM)</label><input type="text" id="v_km"></div>
+      <div class="field"><label>Last PM Date</label><input type="date" id="v_pm_date"></div>
+      <div class="field"><label>Renewal Date</label><input type="date" id="v_ren_date"></div>
+
+      <div class="field" style="margin-top:6px;"><label>Driver Details (name and contact number) <span id="drvAutofillTag"></span></label>
+        <div class="combo-wrap">
+          <input type="text" id="drv_det" placeholder="Type driver name or ID to search Driver Master..." autocomplete="off">
+          <div class="combo-list" id="drvComboList"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Driver Belongs To AGFS or Rented?</label>
+        <input type="text" id="drv_b" placeholder="Auto-fills from Driver Master">
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps 1-3: checklist sections, built by JS -->
+  <div class="step hidden" data-step="1"><div class="card"><h2>Vehicle Checklist</h2><div id="checklist-v" class="checklist-2col"></div></div></div>
+  <div class="step hidden" data-step="2"><div class="card"><h2>Driver Checklist</h2><div id="checklist-d"></div></div></div>
+  <div class="step hidden" data-step="3"><div class="card"><h2>Passenger Checklist</h2><div id="checklist-p"></div></div></div>
+
+  <!-- Step 4: Photos + condition -->
+  <div class="step hidden" data-step="4">
+    <div class="card">
+      <h2>Photos & Overall Condition</h2>
+      <div class="photo-grid" id="photoGrid"></div>
+      <div class="field"><label>Overall Condition</label>
+        <select id="oc">
+          <option value="Good">Good</option>
+          <option value="Satisfactory">Satisfactory</option>
+          <option value="Needs Attention">Needs Attention</option>
+          <option value="Unfit">Unfit</option>
+        </select>
+      </div>
+      <div class="field"><label>Comment</label><textarea id="comment_txt" placeholder="General remarks..."></textarea></div>
+    </div>
+  </div>
+
+  <!-- Step 5: Sign-off + review -->
+  <div class="step hidden" data-step="5">
+    <div class="card">
+      <h2>Sign-Off</h2>
+      <div class="row2">
+        <div class="field"><label>Inspected By</label><input type="text" id="insp_name"></div>
+        <div class="field"><label>Reviewed By</label><input type="text" id="rev_name"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Review</h2>
+      <div id="reviewSummary"></div>
+    </div>
+  </div>
+
+  <div id="wizardStatus" class="status-msg"></div>
+  <div class="wizard-nav">
+    <button id="backBtn" onclick="wizardBack()">Back</button>
+    <button id="nextBtn" class="primary" onclick="wizardNext()">Next</button>
+    <button id="submitBtn" class="submit hidden" onclick="submitInspection()">Submit Inspection</button>
+  </div>
+  <div id="postSubmitActions" class="wizard-nav hidden">
+    <button onclick="downloadInspectionPDF()" class="submit">⬇ Download PDF</button>
+    <button onclick="backToDashboardAfterSubmit()" class="primary">Back to Dashboard</button>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal-sheet">
+    <button class="modal-close" onclick="closeDetail()">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+/* ============= CONFIG ============= */
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx2cWCzeCvAwUPM68b6reveF673JWNelse2iYy7eEIJvqcow-553xnrWKQxEE_Sdf4AzA/exec";
+
+/* Fleet Master / Driver Master backend (same one used by your Fleet & Driver Tracker) */
+const FLEET_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzVC9NQMXYXtLn7ogioO2XQAvZsM6b-gsBSmJFxiuPlXj3nACGER1CUkG0V6sIK1sGP/exec";
+
+const CHECKLIST_QUESTIONS = {
+  v: [
+    "Preventive maintenance record available as per vehicle manufacturer guidelines (Oil, filters, brake pad, battery etc...)",
+    "Any recommendations or issues found in preventive maintenance",
+    "Is the manufacturer's instruction book available in the vehicles?",
+    "Is the First aid kit available in the vehicle and inspected?",
+    "Is the fire extinguisher available in the vehicle and inspected?",
+    "Is this vehicle provided with Triangle Reflectors for roadside assistance?",
+    "According to physical inspection any history of accident? Dents, broken lights etc",
+    "Is spare tire and related accessories available?",
+    "Is tire condition good of the vehicle? Check the date of tires too",
+    "All exterior lights are working in good condition including hazard lights?",
+    "All interior lights are working in good condition?",
+    "Is the vehicle horn and reverse alarm in working condition?",
+    "Is there a safe means of access and exit of the vehicle exists?",
+    "Is there a vehicle defect report system in place?",
+    "Is the condition of seats in good condition?",
+    "Seat belts and head rests are available and in good condition?",
+    "Air condition / ventilation system of the vehicle in good condition?",
+    "Warning and reflective signs are available in the vehicle?",
+    "Handhold provided and in good condition (applicable for bus only)",
+    "Anti-slippery surface provided inside the vehicle?",
+    "Complaint number available at the backside of the vehicle?",
+    "Cleanliness of the vehicle (interior and exterior)",
+    "Ask driver to take you a short test drive to check vibration, noise or other issues"
+  ],
+  d: [
+    "Are driver aware about AGFS QHSE policies and procedures",
+    "Is on the job training provided including information about the task, specific hazards, and UAE Road safety rules? By Sub-contractor.",
+    "Did driver complete defensive driving safety by RTA approved training center? Ask evidence",
+    "Drivers carry out safety checks before using the vehicle",
+    "Write down the drivers experience on this vehicle and his concerns if any"
+  ],
+  p: [
+    "Driver driving according to RTA and AGFS safety guidelines?",
+    "Do driver use the correct routes and follow schedule timings?",
+    "Do drivers drive within the speed limits and no harsh driving?",
+    "Write down the passenger's experience on this vehicle and their concerns"
+  ]
+};
+const SECTION_LABELS = { v: "Vehicle", d: "Driver", p: "Passenger" };
+
+const CHECKLIST_QUESTIONS_AR = {
+  v: [
+    "سجل الصيانة الوقائية متوفر وفقاً لإرشادات الشركة المصنعة للمركبة",
+    "هل توجد أي توصيات أو مشاكل تم رصدها في الصيانة الوقائية؟",
+    "هل كتيب تعليمات الشركة المصنعة متوفر في المركبة؟",
+    "هل حقيبة الإسعافات الأولية متوفرة في المركبة وتم فحصها؟",
+    "هل طفاية الحريق متوفرة في المركبة وتم فحصها؟",
+    "هل المركبة مزودة بمثلثات عاكسة للمساعدة على الطريق؟",
+    "وفقاً للفحص الظاهري، هل توجد أي آثار لحادث سابق؟",
+    "هل الإطار الاحتياطي والملحقات ذات الصلة متوفرة؟",
+    "هل حالة إطارات المركبة جيدة؟",
+    "هل جميع الأضواء الخارجية تعمل بحالة جيدة بما في ذلك أضواء الخطر؟",
+    "هل جميع الأضواء الداخلية تعمل بحالة جيدة؟",
+    "هل بوق المركبة وإنذار الرجوع للخلف يعملان بشكل جيد؟",
+    "هل توجد وسيلة آمنة للصعود إلى المركبة والنزول منها؟",
+    "هل يوجد نظام معتمد للإبلاغ عن أعطال المركبة؟",
+    "هل حالة المقاعد جيدة؟",
+    "هل أحزمة الأمان ومساند الرأس متوفرة وبحالة جيدة؟",
+    "هل نظام التكييف / التهوية في المركبة يعمل بحالة جيدة؟",
+    "هل لافتات التحذير والعلامات العاكسة متوفرة في المركبة؟",
+    "هل مقابض التثبيت متوفرة وبحالة جيدة؟ (للحافلات فقط)",
+    "هل الأرضية الداخلية للمركبة مضادة للانزلاق؟",
+    "هل رقم الشكاوى متوفر على الجزء الخلفي من المركبة؟",
+    "نظافة المركبة (من الداخل والخارج)",
+    "فحص القيادة التجريبية (اهتزاز، ضوضاء أو مشاكل أخرى)"
+  ],
+  d: [
+    "هل السائق على دراية بسياسات وإجراءات الصحة والسلامة والبيئة الخاصة بشركة AGFS؟",
+    "هل تم توفير تدريب أثناء العمل (المهام، المخاطر، السلامة المرورية في دولة الإمارات)؟",
+    "هل أكمل السائق دورة القيادة الدفاعية لدى مركز تدريب معتمد من هيئة الطرق والمواصلات؟",
+    "هل يقوم السائق بإجراء فحوصات السلامة قبل استخدام المركبة؟",
+    "خبرة السائق مع هذه المركبة وأي ملاحظات"
+  ],
+  p: [
+    "هل يقود السائق وفقاً لإرشادات السلامة الخاصة بهيئة الطرق والمواصلات وشركة AGFS؟",
+    "هل يلتزم السائق بالمسارات الصحيحة ومواعيد الجدول الزمني؟",
+    "هل يلتزم السائق بحدود السرعة ويتجنب القيادة العنيفة؟",
+    "تجربة الركاب في هذه المركبة وأي ملاحظات"
+  ]
+};
+
+/* ============= STATE ============= */
+let currentStep = 0;
+const TOTAL_STEPS = 6;
+let photos = [null, null, null, null];
+let allInspections = [];
+let currentFilter = "all";
+let fleetRecords = [];
+let driverRecords = [];
+let selectedFleetRecord = null;
+let selectedDriverRecord = null;
+
+/* ============= INIT ============= */
+document.addEventListener("DOMContentLoaded", () => {
+  buildChecklistUI();
+  buildPhotoGrid();
+  document.getElementById("date_today").valueAsDate = new Date();
+  loadInspections();
+  loadFleetAndDrivers();
+  initVehicleCombo();
+  initDriverCombo();
+  registerServiceWorker();
+  initOnlineStatus();
+});
+
+/* ============= PWA: OFFLINE / INSTALL SUPPORT ============= */
+function registerServiceWorker(){
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+}
+
+function initOnlineStatus(){
+  const banner = document.createElement("div");
+  banner.id = "offlineBanner";
+  banner.style.cssText = "display:none; position:sticky; top:0; z-index:25; background:#B0125C; color:#fff; text-align:center; font-size:12px; font-weight:700; padding:6px;";
+  banner.textContent = "You're offline — the app is cached, but submitting requires a connection.";
+  document.body.insertBefore(banner, document.body.firstChild);
+
+  function updateStatus(){
+    banner.style.display = navigator.onLine ? "none" : "block";
+  }
+  window.addEventListener("online", updateStatus);
+  window.addEventListener("offline", updateStatus);
+  updateStatus();
+}
+
+/* ============= FLEET / DRIVER MASTER LOOKUP ============= */
+function loadFleetAndDrivers(){
+  fetch(FLEET_SCRIPT_URL + "?action=records")
+    .then(r=>r.json()).then(d=>{ if(d && d.ok) fleetRecords = d.data || []; })
+    .catch(()=>{});
+  fetch(FLEET_SCRIPT_URL + "?action=drivers")
+    .then(r=>r.json()).then(d=>{ if(d && d.ok) driverRecords = d.data || []; })
+    .catch(()=>{});
+}
+
+function initVehicleCombo(){
+  const input = document.getElementById("veh_reg");
+  const list = document.getElementById("vehComboList");
+
+  input.addEventListener("input", ()=>{
+    selectedFleetRecord = null;
+    document.getElementById("vehAutofillTag").textContent = "";
+    const q = input.value.trim().toLowerCase();
+    if(!q){ list.classList.remove("show"); return; }
+    const matches = fleetRecords.filter(r =>
+      (r.plate||"").toLowerCase().includes(q) || (r.reg||"").toLowerCase().includes(q)
+    ).slice(0,8);
+    renderComboList(list, matches, r => `
+      <div class="primary">${r.plate||"—"}</div>
+      <div class="secondary">${r.make||""} ${r.category?("· "+r.category):""} ${r.region?("· "+r.region):""}</div>
+    `, r => selectVehicle(r));
+  });
+  input.addEventListener("blur", ()=> setTimeout(()=>list.classList.remove("show"), 150));
+}
+
+// Matches a fleet record's field regardless of exact header naming
+// (e.g. "Maker/Model" -> maker/model, "Make Year" -> make_year, etc.)
+function normKey(k){ return String(k).toLowerCase().replace(/[^a-z0-9]/g,""); }
+function getFleetVal(record, ...candidates){
+  const targets = candidates.map(normKey);
+  for(const key in record){
+    if(targets.includes(normKey(key))) return record[key];
+  }
+  return "";
+}
+
+function selectVehicle(r){
+  selectedFleetRecord = r;
+  document.getElementById("veh_reg").value = r.plate || "";
+  document.getElementById("vehComboList").classList.remove("show");
+  document.getElementById("vehAutofillTag").textContent = "Auto-filled from Fleet Master";
+
+  if(r.make) document.getElementById("v_make").value = r.make;
+  if(r.category) document.getElementById("v_sc").value = r.category;
+  if(r.region) document.getElementById("region").value = r.region;
+  if(r.own){
+    document.getElementById("veh_b").value = r.own;
+    if(r.owner) document.getElementById("veh_b_txt").value = r.owner;
+  }
+
+  const makeYear = getFleetVal(r, "make_year", "makeyear", "year");
+  if(makeYear) document.getElementById("v_make_year").value = makeYear;
+
+  // Auto-link the driver assigned to this plate, if one exists in Driver Master
+  const match = driverRecords.find(d => (d.vehicle_plate||"").trim().toLowerCase() === (r.plate||"").trim().toLowerCase());
+  if(match) selectDriver(match);
+}
+
+function initDriverCombo(){
+  const input = document.getElementById("drv_det");
+  const list = document.getElementById("drvComboList");
+
+  input.addEventListener("input", ()=>{
+    selectedDriverRecord = null;
+    document.getElementById("drvAutofillTag").textContent = "";
+    const q = input.value.trim().toLowerCase();
+    if(!q){ list.classList.remove("show"); return; }
+    const matches = driverRecords.filter(d =>
+      (d.name||"").toLowerCase().includes(q) || (d.driver_id||"").toLowerCase().includes(q)
+    ).slice(0,8);
+    renderComboList(list, matches, d => `
+      <div class="primary">${d.name||"—"} ${d.driver_id?("("+d.driver_id+")"):""}</div>
+      <div class="secondary">${d.contact||""} ${d.vehicle_plate?("· Vehicle: "+d.vehicle_plate):""}</div>
+    `, d => selectDriver(d));
+  });
+  input.addEventListener("blur", ()=> setTimeout(()=>list.classList.remove("show"), 150));
+}
+
+function selectDriver(d){
+  selectedDriverRecord = d;
+  let detail = d.name || "";
+  if(d.driver_id) detail += " (" + d.driver_id + ")";
+  if(d.contact) detail += " — " + d.contact;
+  document.getElementById("drv_det").value = detail;
+  document.getElementById("drvComboList").classList.remove("show");
+  document.getElementById("drvAutofillTag").textContent = "Auto-filled from Driver Master";
+  if(d.driver_type) document.getElementById("drv_b").value = d.driver_type;
+}
+
+function renderComboList(listEl, items, renderFn, onSelect){
+  if(!items.length){
+    listEl.innerHTML = `<div class="combo-empty">No matches in Fleet/Driver Master. You can still type a custom entry.</div>`;
+    listEl.classList.add("show");
+    return;
+  }
+  listEl.innerHTML = items.map((item,i)=>`<div class="combo-item" data-i="${i}">${renderFn(item)}</div>`).join("");
+  listEl.classList.add("show");
+  listEl.querySelectorAll(".combo-item").forEach((el,i)=>{
+    el.addEventListener("mousedown", e=>{ e.preventDefault(); onSelect(items[i]); });
+  });
+}
+
+function showView(view){
+  document.getElementById("dashboardView").classList.toggle("hidden", view!=="dashboard");
+  document.getElementById("wizardView").classList.toggle("hidden", view!=="wizard");
+  document.getElementById("tabDashboard").classList.toggle("active", view==="dashboard");
+  document.getElementById("tabWizard").classList.toggle("active", view==="wizard");
+  if(view==="dashboard") loadInspections();
+  if(view==="wizard"){
+    document.getElementById("postSubmitActions").classList.add("hidden");
+    renderStep();
+  }
+}
+
+/* ============= CHECKLIST UI ============= */
+function buildChecklistUI(){
+  Object.keys(CHECKLIST_QUESTIONS).forEach(prefix => {
+    const container = document.getElementById("checklist-"+prefix);
+    CHECKLIST_QUESTIONS[prefix].forEach((q, i) => {
+      const id = prefix+i;
+      const qAr = (CHECKLIST_QUESTIONS_AR[prefix] || [])[i] || "";
+      const div = document.createElement("div");
+      div.className = "qitem";
+      div.innerHTML = `
+        <div class="qtext">${i+1}. ${q}</div>
+        ${qAr ? `<div class="qtext-ar" dir="rtl">${qAr}</div>` : ""}
+        <div class="yn-group" data-name="${id}">
+          <button type="button" class="yn-btn y active" data-val="Y">YES</button>
+          <button type="button" class="yn-btn n" data-val="N">NO</button>
+        </div>
+        <input type="text" id="${id}_rem" placeholder="Remarks (optional)">
+      `;
+      container.appendChild(div);
+    });
+  });
+  document.querySelectorAll(".yn-group").forEach(group=>{
+    group.addEventListener("click", e=>{
+      const btn = e.target.closest(".yn-btn");
+      if(!btn) return;
+      group.querySelectorAll(".yn-btn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+}
+
+/* ============= PHOTOS ============= */
+function buildPhotoGrid(){
+  const grid = document.getElementById("photoGrid");
+  grid.innerHTML = "";
+  for(let i=0;i<4;i++){
+    const slot = document.createElement("div");
+    slot.className = "photo-slot";
+    slot.id = "photoSlot"+i;
+    slot.innerHTML = `
+      <label for="photoInput${i}">+</label>
+      <input type="file" id="photoInput${i}" accept="image/*" capture="environment">
+    `;
+    grid.appendChild(slot);
+    document.getElementById("photoInput"+i).addEventListener("change", e=>handlePhoto(e,i));
+  }
+}
+function handlePhoto(e,i){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    photos[i] = ev.target.result;
+    const slot = document.getElementById("photoSlot"+i);
+    slot.innerHTML = `<img src="${ev.target.result}"><button class="rm" onclick="removePhoto(${i})">&times;</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+function removePhoto(i){
+  photos[i] = null;
+  const slot = document.getElementById("photoSlot"+i);
+  slot.innerHTML = `<label for="photoInput${i}">+</label><input type="file" id="photoInput${i}" accept="image/*" capture="environment">`;
+  document.getElementById("photoInput"+i).addEventListener("change", e=>handlePhoto(e,i));
+}
+
+/* ============= WIZARD NAV ============= */
+const STEP_LABELS = [
+  "Vehicle & Site Info", "Vehicle Checklist", "Driver Checklist",
+  "Passenger Checklist", "Photos & Condition", "Sign-Off & Review"
+];
+
+function wizardNext(){
+  if(currentStep === 0){
+    if(!document.getElementById("veh_reg").value.trim()){
+      alert("Please enter Vehicle Reg. Details before continuing.");
+      return;
+    }
+  }
+  if(currentStep < TOTAL_STEPS-1){
+    currentStep++;
+    renderStep();
+  }
+}
+function wizardBack(){
+  if(currentStep > 0){
+    currentStep--;
+    renderStep();
+  }
+}
+function renderStep(){
+  document.querySelectorAll(".step").forEach(s=>{
+    s.classList.toggle("hidden", parseInt(s.dataset.step) !== currentStep);
+  });
+  document.getElementById("progressFill").style.width = ((currentStep+1)/TOTAL_STEPS*100)+"%";
+  document.getElementById("stepLabel").textContent = "Step "+(currentStep+1)+" of "+TOTAL_STEPS+" — "+STEP_LABELS[currentStep];
+  document.getElementById("backBtn").style.visibility = currentStep===0 ? "hidden" : "visible";
+  document.getElementById("nextBtn").classList.toggle("hidden", currentStep===TOTAL_STEPS-1);
+  document.getElementById("submitBtn").classList.toggle("hidden", currentStep!==TOTAL_STEPS-1);
+  document.getElementById("wizardStatus").textContent = "";
+  if(currentStep === TOTAL_STEPS-1) buildReview();
+}
+
+function buildReview(){
+  const failCount = countFails();
+  const rows = [
+    ["Vehicle", document.getElementById("veh_reg").value],
+    ["Driver", document.getElementById("drv_det").value],
+    ["Date", document.getElementById("date_today").value],
+    ["Overall Condition", document.getElementById("oc").value],
+    ["Items Flagged", failCount]
+  ];
+  document.getElementById("reviewSummary").innerHTML = rows.map(r=>
+    `<div class="review-row"><span class="k">${r[0]}</span><span class="v">${r[1]||"—"}</span></div>`
+  ).join("");
+}
+
+function countFails(){
+  let n=0;
+  Object.keys(CHECKLIST_QUESTIONS).forEach(prefix=>{
+    CHECKLIST_QUESTIONS[prefix].forEach((q,i)=>{
+      const group = document.querySelector(`.yn-group[data-name="${prefix+i}"]`);
+      const active = group.querySelector(".yn-btn.active");
+      if(active && active.dataset.val === "N") n++;
+    });
+  });
+  return n;
+}
+
+/* ============= SUBMIT ============= */
+function submitInspection(){
+  const checklist = {};
+  const failedItems = [];
+  let failCount = 0;
+
+  Object.keys(CHECKLIST_QUESTIONS).forEach(prefix=>{
+    checklist[prefix] = CHECKLIST_QUESTIONS[prefix].map((q,i)=>{
+      const group = document.querySelector(`.yn-group[data-name="${prefix+i}"]`);
+      const active = group.querySelector(".yn-btn.active");
+      const answer = active ? active.dataset.val : "";
+      const remarks = document.getElementById(prefix+i+"_rem").value;
+      if(answer === "N"){ failCount++; failedItems.push(q); }
+      return { q, a: answer, remarks };
+    });
+  });
+
+  const formData = {
+    site_loc: val("site_loc"), region: val("region"), date_today: val("date_today"),
+    veh_reg: val("veh_reg"),
+    radio_veh_b: val("veh_b"), veh_b_txt: val("veh_b_txt"),
+    drv_det: val("drv_det"), radio_drv_b: val("drv_b"),
+    v_make: val("v_make"), v_make_year: val("v_make_year"),
+    v_km: val("v_km"), v_sc: val("v_sc"), v_pm_date: val("v_pm_date"), v_ren_date: val("v_ren_date"),
+    radio_oc: val("oc"), comment_txt: val("comment_txt"),
+    insp_name: val("insp_name"),
+    rev_name: val("rev_name")
+  };
+
+  const payload = {
+    formData, checklist, failCount, failedItems,
+    photos: photos.filter(p=>p), submittedAt: new Date().toISOString()
+  };
+
+  const statusEl = document.getElementById("wizardStatus");
+  const submitBtn = document.getElementById("submitBtn");
+  submitBtn.disabled = true;
+  statusEl.style.color = "#555";
+  statusEl.textContent = "Submitting...";
+
+  fetch(SCRIPT_URL, {
+    method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify(payload)
+  }).then(r=>r.json()).then(data=>{
+    submitBtn.disabled = false;
+    if(data && data.result === "success"){
+      statusEl.style.color = "#2E7D46";
+      statusEl.innerHTML = "✓ Inspection submitted successfully.";
+
+      // Build the report data locally from what was just submitted —
+      // this way PDF download works immediately, even if the Dashboard's
+      // read-back from Sheets isn't working yet.
+      currentDetailSummary = buildLocalSummary(formData, failCount, data.submissionId);
+      currentDetailItems = buildLocalItems(checklist);
+
+      document.getElementById("submitBtn").classList.add("hidden");
+      document.getElementById("postSubmitActions").classList.remove("hidden");
+    } else {
+      statusEl.style.color = "#C0392B";
+      statusEl.textContent = "Failed: " + (data && data.message ? data.message : "unknown error");
+    }
+  }).catch(()=>{
+    submitBtn.disabled = false;
+    statusEl.style.color = "#C0392B";
+    statusEl.textContent = "Could not reach Google Sheets. Check your connection.";
+  });
+}
+
+function buildLocalSummary(fd, failCount, submissionId){
+  return {
+    "Submission ID": submissionId || "",
+    "Site / Location": fd.site_loc, "Emirate / Region": fd.region, "Date": fd.date_today,
+    "Vehicle Reg. Details": fd.veh_reg, "Vehicle Owner": fd.radio_veh_b, "Vehicle Owner (Rented Co.)": fd.veh_b_txt,
+    "Driver Details": fd.drv_det, "Driver Owner": fd.radio_drv_b,
+    "Make": fd.v_make, "Make Year": fd.v_make_year,
+    "Mileage (KM)": fd.v_km, "Category": fd.v_sc,
+    "Last PM Date": fd.v_pm_date, "Renewal Date": fd.v_ren_date,
+    "Overall Condition": fd.radio_oc, "Comment": fd.comment_txt, "Fail Count": failCount,
+    "Inspected By": fd.insp_name, "Reviewed By": fd.rev_name
+  };
+}
+function buildLocalItems(checklist){
+  const items = [];
+  Object.keys(checklist).forEach(prefix=>{
+    const label = SECTION_LABELS[prefix] || prefix;
+    checklist[prefix].forEach(row=> items.push({ section: label, question: row.q, answer: row.a, remarks: row.remarks }));
+  });
+  return items;
+}
+
+function backToDashboardAfterSubmit(){
+  resetWizard();
+  document.getElementById("submitBtn").classList.remove("hidden");
+  document.getElementById("postSubmitActions").classList.add("hidden");
+  showView("dashboard");
+}
+
+function val(id){ const el=document.getElementById(id); return el ? el.value : ""; }
+function radioVal(name){ const r=document.querySelector(`input[name="${name}"]:checked`); return r ? r.value : ""; }
+
+function resetWizard(){
+  currentStep = 0;
+  document.querySelectorAll(".field input, .field textarea, .field select").forEach(el=>{
+    if(el.type==="radio") return;
+    el.value = "";
+  });
+  document.getElementById("date_today").valueAsDate = new Date();
+  document.querySelectorAll(".yn-group").forEach(g=>{
+    g.querySelectorAll(".yn-btn").forEach(b=>b.classList.remove("active"));
+    g.querySelector(".yn-btn.y").classList.add("active");
+  });
+  document.querySelectorAll('[id^="photoInput"]').forEach((el,i)=>{});
+  photos = [null,null,null,null];
+  buildPhotoGrid();
+  selectedFleetRecord = null;
+  selectedDriverRecord = null;
+  document.getElementById("vehAutofillTag").textContent = "";
+  document.getElementById("drvAutofillTag").textContent = "";
+  renderStep();
+}
+
+/* ============= DASHBOARD ============= */
+function loadInspections(){
+  document.getElementById("statusLine").textContent = "Loading...";
+  document.getElementById("statusLine").style.color = "#555";
+  fetch(SCRIPT_URL + "?action=list")
+    .then(r=>{
+      if(!r.ok) throw new Error("HTTP " + r.status + " from the script URL");
+      return r.text();
+    })
+    .then(text=>{
+      let data;
+      try{ data = JSON.parse(text); }
+      catch(e){ throw new Error("Response wasn't JSON — likely a login/permissions page came back instead of data. Check the deployment's 'Who has access' is set to Anyone."); }
+
+      if(data && data.result === "success"){
+        allInspections = data.inspections || [];
+        document.getElementById("statusLine").textContent = "";
+        renderKPIs();
+        renderList();
+      } else {
+        document.getElementById("statusLine").style.color = "#C0392B";
+        document.getElementById("statusLine").textContent = "Script error: " + (data && data.message ? data.message : "unknown — check that doGet exists in your deployed script.");
+      }
+    })
+    .catch(err=>{
+      document.getElementById("statusLine").style.color = "#C0392B";
+      document.getElementById("statusLine").textContent = "Could not reach Google Sheets — " + err.message;
+    });
+}
+
+function renderKPIs(){
+  const total = allInspections.length;
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate()-7);
+  const thisWeek = allInspections.filter(i => new Date(i["Timestamp"]) >= weekAgo).length;
+  const flagged = allInspections.filter(i => (i["Fail Count"]||0) > 0).length;
+  const passed = total - flagged;
+  const vehicles = new Set(allInspections.map(i => i["Vehicle Reg. Details"]).filter(Boolean)).size;
+  document.getElementById("kpiTotal").textContent = total;
+  document.getElementById("kpiWeek").textContent = thisWeek;
+  document.getElementById("kpiPassed").textContent = passed;
+  document.getElementById("kpiFlagged").textContent = flagged;
+  document.getElementById("kpiVehicles").textContent = vehicles;
+  const badge = document.getElementById("tabCountBadge");
+  if(badge) badge.textContent = total;
+}
+
+function setFilter(f){
+  currentFilter = f;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active", c.dataset.f===f));
+  renderList();
+}
+
+function renderList(){
+  const search = document.getElementById("searchBox").value.toLowerCase();
+  const fromVal = document.getElementById("dateFrom").value;
+  const toVal = document.getElementById("dateTo").value;
+
+  let list = allInspections.filter(i=>{
+    if(currentFilter==="flagged" && !((i["Fail Count"]||0)>0)) return false;
+    if(currentFilter==="ok" && (i["Fail Count"]||0)>0) return false;
+    if(search){
+      const hay = [i["Vehicle Reg. Details"], i["Driver Details"], i["Site / Location"]].join(" ").toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    const dRaw = i["Date"] || i["Timestamp"] || "";
+    const d = String(dRaw).slice(0,10);
+    if(fromVal && d && d < fromVal) return false;
+    if(toVal && d && d > toVal) return false;
+    return true;
+  });
+
+  const container = document.getElementById("listContainer");
+  if(!list.length){
+    container.innerHTML = `<div class="empty-state">No inspections found.</div>`;
+    return;
+  }
+  container.innerHTML = list.map(i=>{
+    const flagged = (i["Fail Count"]||0) > 0;
+    const dt = i["Timestamp"] ? new Date(i["Timestamp"]).toLocaleDateString() : (i["Date"]||"");
+    const id = i["Submission ID"];
+    return `
+      <div class="insp-card" onclick="openDetail('${id}')">
+        <div class="left">
+          <div class="veh">${i["Vehicle Reg. Details"]||"—"}</div>
+          <div class="meta">${dt} &middot; ${i["Site / Location"]||""} &middot; ${i["Driver Details"]||""}</div>
+        </div>
+        <button class="card-dl-btn" title="Download PDF" onclick="event.stopPropagation(); downloadCardPDF('${id}')">⬇</button>
+        <span class="badge ${flagged?'bad':'ok'}">${flagged ? (i["Fail Count"]+" flagged") : "Passed"}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function clearDateRange(){
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value = "";
+  renderList();
+}
+
+function downloadCardPDF(id){
+  fetch(SCRIPT_URL + "?action=detail&id=" + encodeURIComponent(id))
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data || data.result !== "success" || !data.summary){
+        alert("Could not load this inspection's details for the PDF.");
+        return;
+      }
+      currentDetailSummary = data.summary;
+      currentDetailItems = data.items || [];
+      downloadInspectionPDF();
+    })
+    .catch(()=> alert("Could not reach Google Sheets."));
+}
+
+/* ============= DETAIL MODAL ============= */
+let currentDetailSummary = null;
+let currentDetailItems = [];
+
+function openDetail(id){
+  document.getElementById("detailModal").classList.remove("hidden");
+  document.getElementById("detailContent").innerHTML = `<div class="status-msg">Loading...</div>`;
+  fetch(SCRIPT_URL + "?action=detail&id=" + encodeURIComponent(id))
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data || data.result !== "success" || !data.summary){
+        document.getElementById("detailContent").innerHTML = `<div class="status-msg" style="color:#C0392B;">Could not load details.</div>`;
+        return;
+      }
+      currentDetailSummary = data.summary;
+      currentDetailItems = data.items || [];
+      renderDetail(data.summary, data.items || []);
+    })
+    .catch(()=>{
+      document.getElementById("detailContent").innerHTML = `<div class="status-msg" style="color:#C0392B;">Could not reach Google Sheets.</div>`;
+    });
+}
+function closeDetail(){ document.getElementById("detailModal").classList.add("hidden"); }
+
+function renderDetail(s, items){
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <h2 style="margin:4px 0 2px;">${s["Vehicle Reg. Details"]||"—"}</h2>
+      <button onclick="downloadInspectionPDF()" style="border:1px solid var(--line); background:var(--ink); color:#fff; border-radius:6px; padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">⬇ Download PDF</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;">
+      ${s["Date"]||""} &middot; ${s["Site / Location"]||""} &middot; ${s["Driver Details"]||""}
+    </div>
+    <div class="review-row"><span class="k">Overall Condition</span><span class="v">${s["Overall Condition"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Items Flagged</span><span class="v">${s["Fail Count"]||0}</span></div>
+    <div class="review-row"><span class="k">Inspected By</span><span class="v">${s["Inspected By"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Reviewed By</span><span class="v">${s["Reviewed By"]||"—"}</span></div>
+  `;
+  const photoLinks = [1,2,3,4].map(n=>s["Photo "+n]).filter(Boolean);
+  if(photoLinks.length){
+    html += `<div class="section-head">Photos</div><div class="photo-links">` +
+      photoLinks.map((u,i)=>`<a href="${u}" target="_blank">Photo ${i+1}</a>`).join("") + `</div>`;
+  }
+  if(s["Comment"]){
+    html += `<div class="section-head">Comment</div><div style="font-size:13px;">${s["Comment"]}</div>`;
+  }
+
+  ["Vehicle","Driver","Passenger"].forEach(section=>{
+    const rows = items.filter(it=>it.section===section);
+    if(!rows.length) return;
+    html += `<div class="section-head">${section} Checklist</div>`;
+    html += rows.map(it=>`
+      <div class="detail-row">
+        <span class="q">${it.question}${it.remarks?(' — <em>'+it.remarks+'</em>'):''}</span>
+        <span class="a ${it.answer==='N'?'n':'y'}">${it.answer||'—'}</span>
+      </div>
+    `).join("");
+  });
+
+  document.getElementById("detailContent").innerHTML = html;
+}
+
+/* ============= PDF REPORT (single inspection) — matches AGFS-QHSE form layout ============= */
+function downloadInspectionPDF(){
+  if(!currentDetailSummary){ alert("No inspection loaded to export."); return; }
+  const s = currentDetailSummary;
+  const items = currentDetailItems;
+  const dot = (on) => `<span class="pr-dot ${on?'on':''}"></span>`;
+  const mark = (isYesCol, matched) => matched
+    ? `<span class="pr-mark ${isYesCol?'yes':'no'}">${isYesCol?'&#10003;':'&#10007;'}</span>`
+    : `<span class="pr-mark"></span>`;
+
+  function checklistRows(sectionLabel, letterOffset){
+    const rows = items.filter(it=>it.section===sectionLabel);
+    return rows.map((it,i)=>{
+      const letter = String.fromCharCode(97 + letterOffset + i); // a, b, c...
+      const isFail = it.answer === "N";
+      return `
+        <tr class="${isFail?'pr-fail':''}">
+          <td class="pr-sr">${letter})</td>
+          <td class="pr-pts">${it.question}</td>
+          <td class="pr-yn">${mark(true, it.answer==="Y")}</td>
+          <td class="pr-yn">${mark(false, it.answer==="N")}</td>
+          <td class="pr-rmk">${it.remarks||""}</td>
+        </tr>`;
+    }).join("");
+  }
+
+  const vRows = items.filter(it=>it.section==="Vehicle");
+  const dRows = items.filter(it=>it.section==="Driver");
+  const pRows = items.filter(it=>it.section==="Passenger");
+
+  const oc = (s["Overall Condition"]||"").toLowerCase();
+  const ocDot = (label) => dot(oc.startsWith(label.toLowerCase().slice(0,4)));
+
+  const reportHtml = `
+    <div class="pr-page">
+      <div class="pr-topbar">
+        <div class="pr-brand">
+          <div class="pr-company">Al Ghurair Infrastructure</div>
+          <div class="pr-division">Facilities Solutions</div>
+        </div>
+        <div class="pr-titlebox"><h1>Vehicle Inspection Checklist</h1></div>
+        <div class="pr-logobox">Logo Area</div>
+      </div>
+
+      <div class="pr-bar3">
+        <div><span class="pr-lbl">Site / Location</span><span class="pr-val">${s["Site / Location"]||"&nbsp;"}</span></div>
+        <div><span class="pr-lbl">Emirates / region</span><span class="pr-val">${s["Emirate / Region"]||"&nbsp;"}</span></div>
+        <div><span class="pr-lbl">Date</span><span class="pr-val">${s["Date"]||"&nbsp;"}</span></div>
+      </div>
+
+      <table class="pr-info2">
+        <tr><th>Vehicle Information</th><th>Details</th></tr>
+        <tr><td class="pr-k">a) Vehicle belongs to AGFS or rented?</td><td>${s["Vehicle Owner"]||"—"} ${s["Vehicle Owner (Rented Co.)"]?(" — "+s["Vehicle Owner (Rented Co.)"]):""}</td></tr>
+        <tr><td class="pr-k">b) Driver belongs to AGFS or rented?</td><td>${s["Driver Owner"]||"—"}</td></tr>
+        <tr><td class="pr-k">c) Driver details (name and contact number)</td><td>${s["Driver Details"]||"—"}</td></tr>
+        <tr><td class="pr-k">d) Vehicle registration details</td><td>${s["Vehicle Reg. Details"]||"—"}</td></tr>
+        <tr><td class="pr-k">e) Year, Make and Model</td><td>${s["Make Year"]||"—"} ${s["Make"]?(" / "+s["Make"]):""}</td></tr>
+        <tr><td class="pr-k">f) Mileage in KM and Seating Capacity SC</td><td>${s["Mileage (KM)"]||"—"} KM ${s["Category"]?(" / "+s["Category"]):""}</td></tr>
+        <tr><td class="pr-k">g) Last preventive maintenance date</td><td>${s["Last PM Date"]||"—"}</td></tr>
+        <tr><td class="pr-k">h) Vehicle renewal date</td><td>${s["Renewal Date"]||"—"}</td></tr>
+      </table>
+
+      <table class="pr-check">
+        <tr><th class="pr-sr">Sr. No</th><th class="pr-pts">Points to Inspect</th><th class="pr-yn">Yes</th><th class="pr-yn">No</th><th class="pr-rmk">Remarks</th></tr>
+        <tr class="pr-band"><td colspan="5">Vehicle Condition Questionnaire</td></tr>
+        ${checklistRows("Vehicle", 0)}
+        <tr class="pr-band"><td colspan="5">Driver Related Questionnaire</td></tr>
+        ${checklistRows("Driver", 0)}
+        <tr class="pr-band"><td colspan="5">Passenger Related Questionnaire</td></tr>
+        ${checklistRows("Passenger", 0)}
+        <tr class="pr-comment-row"><td colspan="5"><strong>Comment if any:</strong> ${s["Comment"]||""}</td></tr>
+        <tr class="pr-oc-row">
+          <td colspan="5">
+            <strong>Overall Condition:</strong>
+            <span class="pr-oc-opt">${ocDot("Good")} Good</span>
+            <span class="pr-oc-opt">${ocDot("Satisfactory")} Satisfactory</span>
+            <span class="pr-oc-opt">${ocDot("Unsatisfactory")} Un-Satisfactory / Needs Improvement</span>
+          </td>
+        </tr>
+      </table>
+
+      <table class="pr-info2" style="margin-top:2px;">
+        <tr><th>Inspected By</th><th>Reviewed By</th></tr>
+        <tr><td class="pr-k">Name: ${s["Inspected By"]||"—"}</td><td>Name: ${s["Reviewed By"]||"—"}</td></tr>
+        <tr><td class="pr-k">Designation:</td><td>Designation:</td></tr>
+        <tr><td class="pr-k">Signature &amp; Date:</td><td>Signature &amp; Date:</td></tr>
+      </table>
+
+      <div class="pr-footer">
+        <span>AGFS-QHSE-F-027 - Rev 01 - 09-07-2025</span>
+        <span>Vehicle Inspection Checklist – QHSE</span>
+        <span>Page 1 of 2</span>
+      </div>
+    </div>
+  `;
+
+  const area = document.getElementById("printReportArea");
+  area.innerHTML = reportHtml;
+  document.body.classList.add("printing-report");
+  window.print();
+}
+
+window.addEventListener("afterprint", ()=>{
+  document.body.classList.remove("printing-report");
+  const area = document.getElementById("printReportArea");
+  if(area) area.innerHTML = "";
+});
+
+renderStep();
+</script>
+<div id="printReportArea"></div>
+</body>
+</html>
