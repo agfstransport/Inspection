@@ -133,7 +133,7 @@ body{margin:0;background:var(--paper);font-family:var(--font);color:var(--ink);p
 .status-msg{text-align:center; font-size:13px; font-weight:700; padding:10px; min-height:20px;}
 .photo-links a{display:inline-block; margin-right:10px; font-size:12.5px; color:var(--ink); text-decoration:underline;}
 
-#printReportArea{ position:absolute; left:-9999px; top:0; width:190mm; padding:14px; background:#fff; }
+#printReportArea{ display:none; position:fixed; top:0; left:0; z-index:50; width:190mm; padding:14px; background:#fff; }
 
 :root{ --pr-purple:#4B2C6F; --pr-band:#6E5A52; }
 .pr-page{ font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; }
@@ -1031,13 +1031,16 @@ function renderDetail(s, items){
 }
 
 /* ============= PDF REPORT (single inspection) — matches AGFS-QHSE form layout ============= */
+const PR_SVG_CHECK = '<svg width="10" height="10" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#2E7D46" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PR_SVG_CROSS = '<svg width="10" height="10" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#C0392B" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
+
 function downloadInspectionPDF(){
   if(!currentDetailSummary){ alert("No inspection loaded to export."); return; }
   const s = currentDetailSummary;
   const items = currentDetailItems;
   const dot = (on) => `<span class="pr-dot ${on?'on':''}"></span>`;
   const mark = (isYesCol, matched) => matched
-    ? `<span class="pr-mark ${isYesCol?'yes':'no'}">${isYesCol?'&#10003;':'&#10007;'}</span>`
+    ? `<span class="pr-mark ${isYesCol?'yes':'no'}">${isYesCol?PR_SVG_CHECK:PR_SVG_CROSS}</span>`
     : `<span class="pr-mark"></span>`;
 
   function checklistRows(sectionLabel, letterOffset){
@@ -1133,33 +1136,43 @@ function downloadInspectionPDF(){
 
 function generatePdfFile(area, s){
   showPdfBusy(true);
-  html2canvas(area, { scale:2, backgroundColor:"#ffffff", useCORS:true }).then(canvas=>{
-    const imgData = canvas.toDataURL("image/png");
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("p","mm","a4");
-    const pageWidth = 210, pageHeight = 297;
-    const imgWidth = pageWidth;
-    const imgHeight = canvas.height * imgWidth / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
+  area.style.display = "block";
 
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    while(heightLeft > 0){
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
+  // Wait a frame so the browser fully lays out/paints the content
+  // before html2canvas captures it — matters most on mobile.
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      html2canvas(area, { scale:2, backgroundColor:"#ffffff", useCORS:true }).then(canvas=>{
+        const imgData = canvas.toDataURL("image/png");
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("p","mm","a4");
+        const pageWidth = 210, pageHeight = 297;
+        const imgWidth = pageWidth;
+        const imgHeight = canvas.height * imgWidth / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
 
-    const safeVeh = (s["Vehicle Reg. Details"]||"inspection").replace(/[^a-zA-Z0-9]/g,"_");
-    const safeDate = (s["Date"]||"").replace(/[^0-9]/g,"");
-    pdf.save(`Inspection_${safeVeh}_${safeDate||Date.now()}.pdf`);
-    showPdfBusy(false);
-    area.innerHTML = "";
-  }).catch(err=>{
-    showPdfBusy(false);
-    alert("Could not generate PDF: " + err.message);
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while(heightLeft > 0){
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        const safeVeh = (s["Vehicle Reg. Details"]||"inspection").replace(/[^a-zA-Z0-9]/g,"_");
+        const safeDate = (s["Date"]||"").replace(/[^0-9]/g,"");
+        pdf.save(`Inspection_${safeVeh}_${safeDate||Date.now()}.pdf`);
+        area.style.display = "none";
+        area.innerHTML = "";
+        showPdfBusy(false);
+      }).catch(err=>{
+        area.style.display = "none";
+        showPdfBusy(false);
+        alert("Could not generate PDF: " + err.message);
+      });
+    }, 80);
   });
 }
 
