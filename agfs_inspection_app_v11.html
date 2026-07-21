@@ -133,49 +133,49 @@ body{margin:0;background:var(--paper);font-family:var(--font);color:var(--ink);p
 .status-msg{text-align:center; font-size:13px; font-weight:700; padding:10px; min-height:20px;}
 .photo-links a{display:inline-block; margin-right:10px; font-size:12.5px; color:var(--ink); text-decoration:underline;}
 
-#printReportArea{ display:none; position:fixed; top:0; left:0; z-index:50; width:780px; padding:14px; background:#fff; }
+#printReportArea{ display:none; position:fixed; top:0; left:0; z-index:50; width:780px; padding:8px; background:#fff; }
 
 :root{ --pr-purple:#4B2C6F; --pr-band:#6E5A52; }
 .pr-page{ font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; }
 .pr-topbar{ display:flex; border:1px solid #333; }
-.pr-topbar .pr-brand{ flex:1.4; padding:8px 12px; border-right:1px solid #333; }
-.pr-topbar .pr-brand .pr-company{ color:#8B1A2B; font-weight:800; font-size:13px; }
-.pr-topbar .pr-brand .pr-division{ color:#555; font-size:10px; font-style:italic; }
+.pr-topbar .pr-brand{ flex:1.4; padding:4px 8px; border-right:1px solid #333; }
+.pr-topbar .pr-brand .pr-company{ color:#8B1A2B; font-weight:800; font-size:11px; }
+.pr-topbar .pr-brand .pr-division{ color:#555; font-size:8px; font-style:italic; }
 .pr-topbar .pr-titlebox{ flex:2.4; display:flex; align-items:center; justify-content:center; border-right:1px solid #333; }
-.pr-topbar .pr-titlebox h1{ font-size:18px; margin:0; }
-.pr-topbar .pr-logobox{ flex:1.4; display:flex; align-items:center; justify-content:center; color:#999; font-size:10px; font-style:italic; }
+.pr-topbar .pr-titlebox h1{ font-size:14px; margin:0; }
+.pr-topbar .pr-logobox{ flex:1.4; display:flex; align-items:center; justify-content:center; color:#999; font-size:8px; font-style:italic; }
 
-.pr-bar3{ display:flex; background:var(--pr-purple); color:#fff; border:1px solid #333; border-top:none; font-size:10.5px; }
-.pr-bar3 > div{ flex:1; padding:5px 8px; border-right:1px solid rgba(255,255,255,.35); }
+.pr-bar3{ display:flex; background:var(--pr-purple); color:#fff; border:1px solid #333; border-top:none; font-size:8.5px; }
+.pr-bar3 > div{ flex:1; padding:2px 6px; border-right:1px solid rgba(255,255,255,.35); }
 .pr-bar3 > div:last-child{ border-right:none; }
-.pr-bar3 .pr-lbl{ font-weight:700; margin-right:6px; }
+.pr-bar3 .pr-lbl{ font-weight:700; margin-right:4px; }
 .pr-bar3 .pr-val{ border-bottom:1px solid rgba(255,255,255,.6); display:inline-block; min-width:60%; }
 
-table.pr-info2{ width:100%; border-collapse:collapse; font-size:10.5px; margin-top:-1px; }
-table.pr-info2 th{ background:var(--pr-purple); color:#fff; text-align:left; padding:5px 8px; border:1px solid #333; font-size:10.5px; }
-table.pr-info2 td{ border:1px solid #333; padding:5px 8px; vertical-align:top; }
+table.pr-info2{ width:100%; border-collapse:collapse; font-size:8.5px; margin-top:-1px; }
+table.pr-info2 th{ background:var(--pr-purple); color:#fff; text-align:left; padding:2px 6px; border:1px solid #333; font-size:8.5px; }
+table.pr-info2 td{ border:1px solid #333; padding:2px 6px; vertical-align:top; line-height:1.25; }
 table.pr-info2 td.pr-k{ width:38%; }
 
-table.pr-check{ width:100%; border-collapse:collapse; font-size:10px; margin-top:-1px; }
-table.pr-check th{ background:var(--pr-purple); color:#fff; padding:5px 6px; border:1px solid #333; text-align:left; }
-table.pr-check td{ border:1px solid #333; padding:4px 6px; vertical-align:top; }
+table.pr-check{ width:100%; border-collapse:collapse; font-size:7.6px; margin-top:-1px; }
+table.pr-check th{ background:var(--pr-purple); color:#fff; padding:2px 4px; border:1px solid #333; text-align:left; }
+table.pr-check td{ border:1px solid #333; padding:1.5px 4px; vertical-align:top; line-height:1.2; }
 table.pr-check td.pr-sr{ width:3%; text-align:center; }
 table.pr-check td.pr-pts{ width:55%; }
 table.pr-check td.pr-yn{ width:6%; text-align:center; }
 table.pr-check td.pr-rmk{ width:20%; }
-tr.pr-band td{ background:var(--pr-band); color:#fff; font-weight:700; text-align:center; padding:5px; }
-.pr-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; border:1.4px solid #333; }
+tr.pr-band td{ background:var(--pr-band); color:#fff; font-weight:700; text-align:center; padding:2px; }
+.pr-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; border:1.2px solid #333; }
 .pr-dot.on{ background:#2255cc; border-color:#2255cc; }
-.pr-mark{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1.4px solid #999; font-size:11px; font-weight:800; line-height:1; }
+.pr-mark{ display:inline-flex; align-items:center; justify-content:center; width:11px; height:11px; border-radius:50%; border:1.2px solid #999; line-height:1; }
 .pr-mark.yes{ border-color:#2E7D46; color:#2E7D46; }
 .pr-mark.no{ border-color:#C0392B; color:#C0392B; }
 tr.pr-fail td{ background:#FBEAE8; }
 
-.pr-comment-row td{ padding:8px; font-size:10.5px; }
-.pr-oc-row td{ padding:6px 8px; font-size:10.5px; }
-.pr-oc-opt{ display:inline-flex; align-items:center; gap:5px; margin-right:18px; }
+.pr-comment-row td{ padding:3px 6px; font-size:8.5px; }
+.pr-oc-row td{ padding:2px 6px; font-size:8.5px; }
+.pr-oc-opt{ display:inline-flex; align-items:center; gap:3px; margin-right:12px; }
 
-.pr-footer{ display:flex; justify-content:space-between; font-size:8.5px; color:#666; margin-top:8px; padding-top:4px; border-top:1px solid #ccc; }
+.pr-footer{ display:flex; justify-content:space-between; font-size:6.5px; color:#666; margin-top:4px; padding-top:2px; border-top:1px solid #ccc; }
 
 .pr-page, .pr-page *{ -webkit-text-size-adjust:100% !important; text-size-adjust:100% !important; }
 
@@ -1177,7 +1177,7 @@ function downloadInspectionPDF(){
       <div class="pr-footer">
         <span>AGFS-QHSE-F-027 - Rev 01 - 09-07-2025</span>
         <span>Vehicle Inspection Checklist – QHSE</span>
-        <span>Page 1 of 2</span>
+        <span>Page 1 of 1</span>
       </div>
     </div>
   `;
@@ -1200,19 +1200,19 @@ function generatePdfFile(area, s){
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF("p","mm","a4");
         const pageWidth = 210, pageHeight = 297;
-        const imgWidth = pageWidth;
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+        const canvasRatio = canvas.width / canvas.height;
 
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        while(heightLeft > 0){
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+        // Fit the whole report onto one page — scale down if it's taller
+        // than the page instead of splitting across multiple pages.
+        let imgWidth = pageWidth;
+        let imgHeight = imgWidth / canvasRatio;
+        if(imgHeight > pageHeight){
+          imgHeight = pageHeight;
+          imgWidth = imgHeight * canvasRatio;
         }
+        const xOffset = (pageWidth - imgWidth) / 2;
+        const yOffset = (pageHeight - imgHeight) / 2;
+        pdf.addImage(imgData, "PNG", xOffset, yOffset, imgWidth, imgHeight);
 
         const safeVeh = (s["Vehicle Reg. Details"]||"inspection").replace(/[^a-zA-Z0-9]/g,"_");
         const safeDate = (s["Date"]||"").replace(/[^0-9]/g,"");
