@@ -133,7 +133,7 @@ body{margin:0;background:var(--paper);font-family:var(--font);color:var(--ink);p
 .status-msg{text-align:center; font-size:13px; font-weight:700; padding:10px; min-height:20px;}
 .photo-links a{display:inline-block; margin-right:10px; font-size:12.5px; color:var(--ink); text-decoration:underline;}
 
-#printReportArea{ display:none; position:fixed; top:0; left:0; z-index:50; width:190mm; padding:14px; background:#fff; }
+#printReportArea{ display:none; position:fixed; top:0; left:0; z-index:50; width:780px; padding:14px; background:#fff; }
 
 :root{ --pr-purple:#4B2C6F; --pr-band:#6E5A52; }
 .pr-page{ font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; }
@@ -235,6 +235,11 @@ tr.pr-fail td{ background:#FBEAE8; }
     <div class="chip active" data-f="all" onclick="setFilter('all')">All</div>
     <div class="chip" data-f="flagged" onclick="setFilter('flagged')">Flagged</div>
     <div class="chip" data-f="ok" onclick="setFilter('ok')">Passed</div>
+    <div class="chip" id="selectModeChip" onclick="toggleSelectMode()" style="margin-left:auto;">Select</div>
+  </div>
+  <div id="deleteBar" class="filters hidden" style="justify-content:space-between; align-items:center;">
+    <span id="selectedCountLabel" style="font-size:12.5px; color:var(--ink-soft);">0 selected</span>
+    <button class="chip" style="background:var(--fail); color:#fff; border-color:var(--fail);" onclick="deleteSelected()">🗑 Delete Selected</button>
   </div>
 
   <div id="statusLine" class="status-msg"></div>
@@ -906,6 +911,51 @@ function setFilter(f){
   renderList();
 }
 
+let selectMode = false;
+let selectedIds = new Set();
+
+function toggleSelectMode(){
+  selectMode = !selectMode;
+  selectedIds.clear();
+  document.getElementById("selectModeChip").classList.toggle("active", selectMode);
+  document.getElementById("selectModeChip").textContent = selectMode ? "Cancel" : "Select";
+  document.getElementById("deleteBar").classList.toggle("hidden", !selectMode);
+  renderList();
+}
+
+function toggleCardSelect(id){
+  if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+  document.getElementById("selectedCountLabel").textContent = selectedIds.size + " selected";
+  renderList();
+}
+
+function deleteSelected(){
+  if(!selectedIds.size){ alert("No inspections selected."); return; }
+  if(!confirm(`Delete ${selectedIds.size} inspection(s)? This cannot be undone.`)) return;
+
+  const ids = Array.from(selectedIds);
+  document.getElementById("statusLine").style.color = "#555";
+  document.getElementById("statusLine").textContent = "Deleting...";
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "delete", ids: ids })
+  }).then(r=>r.json()).then(data=>{
+    if(data && data.result === "success"){
+      selectedIds.clear();
+      toggleSelectMode();
+      loadInspections();
+    } else {
+      document.getElementById("statusLine").style.color = "#C0392B";
+      document.getElementById("statusLine").textContent = "Delete failed: " + (data && data.message ? data.message : "unknown error");
+    }
+  }).catch(()=>{
+    document.getElementById("statusLine").style.color = "#C0392B";
+    document.getElementById("statusLine").textContent = "Could not reach Google Sheets.";
+  });
+}
+
 function renderList(){
   const search = document.getElementById("searchBox").value.toLowerCase();
   const fromVal = document.getElementById("dateFrom").value;
@@ -934,13 +984,16 @@ function renderList(){
     const flagged = (i["Fail Count"]||0) > 0;
     const dt = i["Timestamp"] ? new Date(i["Timestamp"]).toLocaleDateString() : (i["Date"]||"");
     const id = i["Submission ID"];
+    const checked = selectedIds.has(id);
+    const clickAction = selectMode ? `toggleCardSelect('${id}')` : `openDetail('${id}')`;
     return `
-      <div class="insp-card" onclick="openDetail('${id}')">
+      <div class="insp-card" onclick="${clickAction}">
+        ${selectMode ? `<input type="checkbox" onclick="event.stopPropagation(); toggleCardSelect('${id}')" ${checked?'checked':''} style="width:18px;height:18px;flex-shrink:0;">` : ""}
         <div class="left">
           <div class="veh">${i["Vehicle Reg. Details"]||"—"}</div>
           <div class="meta">${dt} &middot; ${i["Site / Location"]||""} &middot; ${i["Driver Details"]||""}</div>
         </div>
-        <button class="card-dl-btn" title="Download PDF" onclick="event.stopPropagation(); downloadCardPDF('${id}')">⬇</button>
+        ${!selectMode ? `<button class="card-dl-btn" title="Download PDF" onclick="event.stopPropagation(); downloadCardPDF('${id}')">⬇</button>` : ""}
         <span class="badge ${flagged?'bad':'ok'}">${flagged ? (i["Fail Count"]+" flagged") : "Passed"}</span>
       </div>
     `;
