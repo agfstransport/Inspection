@@ -951,21 +951,26 @@ function loadOverdueVehicles(){
   document.getElementById("overdueStatusLine").style.color = "#555";
   document.getElementById("overdueStatusLine").textContent = "Loading...";
 
-  Promise.all([
+  Promise.allSettled([
     fetch(SCRIPT_URL + "?action=list").then(r=>r.json()),
     fetch(FLEET_SCRIPT_URL + "?action=records").then(r=>r.json())
-  ]).then(([inspData, fleetData])=>{
-    if(!inspData || inspData.result !== "success" || !fleetData || !fleetData.ok){
+  ]).then(([inspResult, fleetResult])=>{
+    const problems = [];
+    if(inspResult.status !== "fulfilled") problems.push("Inspections list: " + inspResult.reason.message);
+    else if(!inspResult.value || inspResult.value.result !== "success") problems.push("Inspections list: " + (inspResult.value && inspResult.value.message ? inspResult.value.message : "unexpected response"));
+
+    if(fleetResult.status !== "fulfilled") problems.push("Fleet Master: " + fleetResult.reason.message);
+    else if(!fleetResult.value || !fleetResult.value.ok) problems.push("Fleet Master: " + (fleetResult.value && fleetResult.value.error ? fleetResult.value.error : "unexpected response"));
+
+    if(problems.length){
       document.getElementById("overdueStatusLine").style.color = "#C0392B";
-      document.getElementById("overdueStatusLine").textContent = "Could not load data.";
+      document.getElementById("overdueStatusLine").textContent = "Could not load data — " + problems.join(" | ");
       return;
     }
-    allInspections = inspData.inspections || [];
-    fleetRecords = fleetData.data || [];
+
+    allInspections = inspResult.value.inspections || [];
+    fleetRecords = fleetResult.value.data || [];
     computeOverdue();
-  }).catch(()=>{
-    document.getElementById("overdueStatusLine").style.color = "#C0392B";
-    document.getElementById("overdueStatusLine").textContent = "Could not reach Google Sheets.";
   });
 }
 
