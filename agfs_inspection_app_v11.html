@@ -254,7 +254,7 @@ tr.pr-fail td{ background:#FBEAE8; }
   <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">
     <div class="kpi"><div class="num" id="kpiOverdueTotal" style="color:var(--fail);">0</div><div class="lbl">Overdue (30+ days)</div></div>
     <div class="kpi"><div class="num" id="kpiNeverInspected" style="color:var(--fail);">0</div><div class="lbl">Never Inspected</div></div>
-    <div class="kpi"><div class="num" id="kpiFleetTotal">0</div><div class="lbl">Total Fleet</div></div>
+    <div class="kpi"><div class="num" id="kpiFleetTotal">0</div><div class="lbl">Passenger Fleet</div></div>
   </div>
   <div class="filters">
     <input type="text" id="overdueSearchBox" placeholder="Search plate..." oninput="renderOverdueList()">
@@ -520,6 +520,13 @@ function loadFleetAndDrivers(){
     .catch(()=>{});
 }
 
+// Passenger vehicle = seats people (Seater/Saloon categories) — excludes
+// pickups, panel vans, and other cargo/utility vehicles from Fleet Master.
+function isPassengerVehicle(record){
+  const cat = (record.category || "").toLowerCase();
+  return cat.includes("seater") || cat.includes("saloon");
+}
+
 function initVehicleCombo(){
   const input = document.getElementById("veh_reg");
   const list = document.getElementById("vehComboList");
@@ -530,7 +537,8 @@ function initVehicleCombo(){
     const q = input.value.trim().toLowerCase();
     if(!q){ list.classList.remove("show"); return; }
     const matches = fleetRecords.filter(r =>
-      (r.plate||"").toLowerCase().includes(q) || (r.reg||"").toLowerCase().includes(q)
+      isPassengerVehicle(r) &&
+      ((r.plate||"").toLowerCase().includes(q) || (r.reg||"").toLowerCase().includes(q))
     ).slice(0,8);
     renderComboList(list, matches, r => `
       <div class="primary">${r.plate||"—"}</div>
@@ -974,7 +982,7 @@ function computeOverdue(){
   const now = new Date();
   const MS_PER_DAY = 24*60*60*1000;
 
-  overdueVehiclesData = fleetRecords.map(v=>{
+  overdueVehiclesData = fleetRecords.filter(isPassengerVehicle).map(v=>{
     const plate = (v.plate||"").trim().toUpperCase();
     const lastDate = lastInspectionByPlate[plate];
     const daysSince = lastDate ? Math.floor((now - lastDate)/MS_PER_DAY) : null;
@@ -994,7 +1002,7 @@ function renderOverdueKPIs(){
   const neverCount = overdueVehiclesData.filter(v=>v.daysSince===null).length;
   document.getElementById("kpiOverdueTotal").textContent = overdueVehiclesData.length;
   document.getElementById("kpiNeverInspected").textContent = neverCount;
-  document.getElementById("kpiFleetTotal").textContent = fleetRecords.length;
+  document.getElementById("kpiFleetTotal").textContent = fleetRecords.filter(isPassengerVehicle).length;
   const badge = document.getElementById("overdueCountBadge");
   if(badge) badge.textContent = overdueVehiclesData.length || "";
 }
