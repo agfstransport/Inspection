@@ -532,6 +532,15 @@ function getFleetVal(record, ...candidates){
   }
   return "";
 }
+// Broader fallback: matches any field whose name simply contains a given
+// substring (e.g. "year"), for cases where the exact header wording varies.
+function getFleetValContains(record, substring){
+  const sub = substring.toLowerCase();
+  for(const key in record){
+    if(key.toLowerCase().includes(sub) && record[key]) return record[key];
+  }
+  return "";
+}
 
 function selectVehicle(r){
   selectedFleetRecord = r;
@@ -547,11 +556,9 @@ function selectVehicle(r){
     if(r.owner) document.getElementById("veh_b_txt").value = r.owner;
   }
 
-  alert("Fleet Master data for this vehicle:\n\n" + JSON.stringify(r, null, 2));
-
-  const makeYear = getFleetVal(r, "make_year", "makeyear", "year", "modelyear", "model_year", "yr", "mfgyear", "mfg_year", "manufactureyear", "vehicleyear");
+  let makeYear = getFleetVal(r, "make_year", "makeyear", "year", "modelyear", "model_year", "yr", "mfgyear", "mfg_year", "manufactureyear", "vehicleyear");
+  if(!makeYear) makeYear = getFleetValContains(r, "year");
   if(makeYear) document.getElementById("v_make_year").value = makeYear;
-  else console.warn("No matching Year field found on this Fleet Master record. Check the console.log above for the actual field names.");
 
   // Auto-link the driver assigned to this plate, if one exists in Driver Master
   const match = driverRecords.find(d => (d.vehicle_plate||"").trim().toLowerCase() === (r.plate||"").trim().toLowerCase());
