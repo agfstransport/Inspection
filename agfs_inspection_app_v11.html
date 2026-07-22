@@ -974,7 +974,7 @@ function renderKPIs(){
   const thisWeek = allInspections.filter(i => new Date(i["Timestamp"]) >= weekAgo).length;
   const flagged = allInspections.filter(i => (i["Fail Count"]||0) > 0).length;
   const passed = total - flagged;
-  const vehicles = new Set(allInspections.map(i => i["Vehicle Reg. Details"]).filter(Boolean)).size;
+  const vehicles = new Set(allInspections.map(i => String(i["Vehicle Reg. Details"]||"")).filter(Boolean)).size;
   document.getElementById("kpiTotal").textContent = total;
   document.getElementById("kpiWeek").textContent = thisWeek;
   document.getElementById("kpiPassed").textContent = passed;
@@ -1023,7 +1023,7 @@ function loadOverdueVehicles(){
 function computeOverdue(){
   const lastInspectionByPlate = {};
   allInspections.forEach(i=>{
-    const plate = (i["Vehicle Reg. Details"]||"").trim().toUpperCase();
+    const plate = String(i["Vehicle Reg. Details"]||"").trim().toUpperCase();
     if(!plate) return;
     const d = new Date(i["Date"] || i["Timestamp"] || "");
     if(isNaN(d)) return;
@@ -1034,11 +1034,11 @@ function computeOverdue(){
   const MS_PER_DAY = 24*60*60*1000;
 
   overdueVehiclesData = fleetRecords.filter(isPassengerVehicle).map(v=>{
-    const plate = (v.plate||"").trim().toUpperCase();
+    const plate = String(v.plate||"").trim().toUpperCase();
     const lastDate = lastInspectionByPlate[plate];
     const daysSince = lastDate ? Math.floor((now - lastDate)/MS_PER_DAY) : null;
     return {
-      plate: v.plate || "—", make: v.make || "", region: v.region || "",
+      plate: String(v.plate || "—"), make: v.make || "", region: v.region || "",
       daysSince: daysSince, overdue: (daysSince === null) || daysSince > 30
     };
   }).filter(v => v.overdue)
@@ -1098,7 +1098,7 @@ function downloadMonthlySummary(){
   const flagged = filtered.filter(i => (i["Fail Count"]||0) > 0).length;
   const passed = total - flagged;
   const passRate = total ? Math.round((passed/total)*100) : 0;
-  const vehicles = new Set(filtered.map(i=>i["Vehicle Reg. Details"]).filter(Boolean)).size;
+  const vehicles = new Set(filtered.map(i=>String(i["Vehicle Reg. Details"]||"")).filter(Boolean)).size;
 
   const failureTally = {};
   filtered.forEach(i=>{
