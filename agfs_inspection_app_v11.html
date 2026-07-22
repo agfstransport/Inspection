@@ -487,7 +487,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("date_today").valueAsDate = new Date();
   loadInspections();
   loadFleetAndDrivers();
-  loadOverdueVehicles();
   initVehicleCombo();
   initDriverCombo();
   registerServiceWorker();
@@ -681,7 +680,10 @@ function showView(view){
   document.getElementById("tabOverdue").classList.toggle("active", view==="overdue");
   document.getElementById("tabWizard").classList.toggle("active", view==="wizard");
   if(view==="dashboard") loadInspections();
-  if(view==="overdue") loadOverdueVehicles();
+  if(view==="overdue"){
+    if(allInspections.length && fleetRecords.length) computeOverdue();
+    else loadOverdueVehicles();
+  }
   if(view==="wizard"){
     document.getElementById("postSubmitActions").classList.add("hidden");
     renderStep();
@@ -987,7 +989,7 @@ let overdueVehiclesData = [];
 
 function loadOverdueVehicles(){
   document.getElementById("overdueStatusLine").style.color = "#555";
-  document.getElementById("overdueStatusLine").textContent = "Loading...";
+  document.getElementById("overdueStatusLine").textContent = "Loading (Fleet Master has ~478 vehicles, this can take up to 20 seconds)...";
 
   Promise.allSettled([
     fetchWithTimeout(SCRIPT_URL + "?action=list", 20000).then(r=>r.json()),
@@ -1008,7 +1010,13 @@ function loadOverdueVehicles(){
 
     allInspections = inspResult.value.inspections || [];
     fleetRecords = fleetResult.value.data || [];
-    computeOverdue();
+
+    try{
+      computeOverdue();
+    } catch(err){
+      document.getElementById("overdueStatusLine").style.color = "#C0392B";
+      document.getElementById("overdueStatusLine").textContent = "Error while processing data: " + err.message;
+    }
   });
 }
 
