@@ -176,6 +176,7 @@ tr.pr-fail td{ background:#FBEAE8; }
 .pr-oc-opt{ display:inline-flex; align-items:center; gap:3px; margin-right:12px; }
 
 .pr-footer{ display:flex; justify-content:space-between; font-size:6.5px; color:#666; margin-top:4px; padding-top:2px; border-top:1px solid #ccc; }
+.pr-section-head{ font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--pr-purple); margin:0 0 4px; }
 
 .pr-page, .pr-page *{ -webkit-text-size-adjust:100% !important; text-size-adjust:100% !important; }
 
@@ -208,6 +209,7 @@ tr.pr-fail td{ background:#FBEAE8; }
 
 <div class="tabbar">
   <div class="tab active" id="tabDashboard" onclick="showView('dashboard')">Dashboard <span id="tabCountBadge" class="tab-badge"></span></div>
+  <div class="tab" id="tabOverdue" onclick="showView('overdue')">Overdue <span id="overdueCountBadge" class="tab-badge" style="background:var(--fail);"></span></div>
   <div class="tab" id="tabWizard" onclick="showView('wizard')">New Inspection</div>
 </div>
 
@@ -241,9 +243,24 @@ tr.pr-fail td{ background:#FBEAE8; }
     <span id="selectedCountLabel" style="font-size:12.5px; color:var(--ink-soft);">0 selected</span>
     <button class="chip" style="background:var(--fail); color:#fff; border-color:var(--fail);" onclick="deleteSelected()">🗑 Delete Selected</button>
   </div>
+  <button class="chip" style="width:100%; padding:11px; font-weight:700; margin-bottom:14px;" onclick="downloadMonthlySummary()">📊 Download Summary Report (uses From/To dates above, or all-time if blank)</button>
 
   <div id="statusLine" class="status-msg"></div>
   <div id="listContainer"></div>
+</div>
+
+<!-- ============= OVERDUE VEHICLES ============= -->
+<div class="wrap hidden" id="overdueView">
+  <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">
+    <div class="kpi"><div class="num" id="kpiOverdueTotal" style="color:var(--fail);">0</div><div class="lbl">Overdue (30+ days)</div></div>
+    <div class="kpi"><div class="num" id="kpiNeverInspected" style="color:var(--fail);">0</div><div class="lbl">Never Inspected</div></div>
+    <div class="kpi"><div class="num" id="kpiFleetTotal">0</div><div class="lbl">Total Fleet</div></div>
+  </div>
+  <div class="filters">
+    <input type="text" id="overdueSearchBox" placeholder="Search plate..." oninput="renderOverdueList()">
+  </div>
+  <div id="overdueStatusLine" class="status-msg"></div>
+  <div id="overdueListContainer"></div>
 </div>
 
 <!-- ============= WIZARD ============= -->
@@ -464,6 +481,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("date_today").valueAsDate = new Date();
   loadInspections();
   loadFleetAndDrivers();
+  loadOverdueVehicles();
   initVehicleCombo();
   initDriverCombo();
   registerServiceWorker();
@@ -611,10 +629,13 @@ function renderComboList(listEl, items, renderFn, onSelect){
 
 function showView(view){
   document.getElementById("dashboardView").classList.toggle("hidden", view!=="dashboard");
+  document.getElementById("overdueView").classList.toggle("hidden", view!=="overdue");
   document.getElementById("wizardView").classList.toggle("hidden", view!=="wizard");
   document.getElementById("tabDashboard").classList.toggle("active", view==="dashboard");
+  document.getElementById("tabOverdue").classList.toggle("active", view==="overdue");
   document.getElementById("tabWizard").classList.toggle("active", view==="wizard");
   if(view==="dashboard") loadInspections();
+  if(view==="overdue") loadOverdueVehicles();
   if(view==="wizard"){
     document.getElementById("postSubmitActions").classList.add("hidden");
     renderStep();
@@ -913,6 +934,165 @@ function renderKPIs(){
   document.getElementById("kpiVehicles").textContent = vehicles;
   const badge = document.getElementById("tabCountBadge");
   if(badge) badge.textContent = total;
+}
+
+/* ============= OVERDUE VEHICLES ============= */
+let overdueVehiclesData = [];
+
+function loadOverdueVehicles(){
+  document.getElementById("overdueStatusLine").style.color = "#555";
+  document.getElementById("overdueStatusLine").textContent = "Loading...";
+
+  Promise.all([
+    fetch(SCRIPT_URL + "?action=list").then(r=>r.json()),
+    fetch(FLEET_SCRIPT_URL + "?action=records").then(r=>r.json())
+  ]).then(([inspData, fleetData])=>{
+    if(!inspData || inspData.result !== "success" || !fleetData || !fleetData.ok){
+      document.getElementById("overdueStatusLine").style.color = "#C0392B";
+      document.getElementById("overdueStatusLine").textContent = "Could not load data.";
+      return;
+    }
+    allInspections = inspData.inspections || [];
+    fleetRecords = fleetData.data || [];
+    computeOverdue();
+  }).catch(()=>{
+    document.getElementById("overdueStatusLine").style.color = "#C0392B";
+    document.getElementById("overdueStatusLine").textContent = "Could not reach Google Sheets.";
+  });
+}
+
+function computeOverdue(){
+  const lastInspectionByPlate = {};
+  allInspections.forEach(i=>{
+    const plate = (i["Vehicle Reg. Details"]||"").trim().toUpperCase();
+    if(!plate) return;
+    const d = new Date(i["Date"] || i["Timestamp"] || "");
+    if(isNaN(d)) return;
+    if(!lastInspectionByPlate[plate] || d > lastInspectionByPlate[plate]) lastInspectionByPlate[plate] = d;
+  });
+
+  const now = new Date();
+  const MS_PER_DAY = 24*60*60*1000;
+
+  overdueVehiclesData = fleetRecords.map(v=>{
+    const plate = (v.plate||"").trim().toUpperCase();
+    const lastDate = lastInspectionByPlate[plate];
+    const daysSince = lastDate ? Math.floor((now - lastDate)/MS_PER_DAY) : null;
+    return {
+      plate: v.plate || "—", make: v.make || "", region: v.region || "",
+      daysSince: daysSince, overdue: (daysSince === null) || daysSince > 30
+    };
+  }).filter(v => v.overdue)
+    .sort((a,b)=> (a.daysSince===null?9999:a.daysSince) < (b.daysSince===null?9999:b.daysSince) ? 1 : -1);
+
+  document.getElementById("overdueStatusLine").textContent = "";
+  renderOverdueKPIs();
+  renderOverdueList();
+}
+
+function renderOverdueKPIs(){
+  const neverCount = overdueVehiclesData.filter(v=>v.daysSince===null).length;
+  document.getElementById("kpiOverdueTotal").textContent = overdueVehiclesData.length;
+  document.getElementById("kpiNeverInspected").textContent = neverCount;
+  document.getElementById("kpiFleetTotal").textContent = fleetRecords.length;
+  const badge = document.getElementById("overdueCountBadge");
+  if(badge) badge.textContent = overdueVehiclesData.length || "";
+}
+
+function renderOverdueList(){
+  const search = document.getElementById("overdueSearchBox").value.toLowerCase();
+  const list = overdueVehiclesData.filter(v => !search || v.plate.toLowerCase().includes(search));
+  const container = document.getElementById("overdueListContainer");
+  if(!list.length){
+    container.innerHTML = `<div class="empty-state">No overdue vehicles — everything's up to date.</div>`;
+    return;
+  }
+  container.innerHTML = list.map(v=>{
+    const lastText = v.daysSince===null ? "Never inspected" : (v.daysSince + " days ago");
+    return `
+      <div class="insp-card" style="cursor:default;">
+        <div class="left">
+          <div class="veh">${v.plate}</div>
+          <div class="meta">${v.make||""} ${v.region?("&middot; "+v.region):""}</div>
+        </div>
+        <span class="badge bad">${lastText}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+/* ============= MONTHLY SUMMARY REPORT ============= */
+function downloadMonthlySummary(){
+  const fromVal = document.getElementById("dateFrom").value;
+  const toVal = document.getElementById("dateTo").value;
+
+  const filtered = allInspections.filter(i=>{
+    const d = String(i["Date"] || i["Timestamp"] || "").slice(0,10);
+    if(fromVal && d && d < fromVal) return false;
+    if(toVal && d && d > toVal) return false;
+    return true;
+  });
+
+  if(!filtered.length){ alert("No inspections found in the selected date range."); return; }
+
+  const total = filtered.length;
+  const flagged = filtered.filter(i => (i["Fail Count"]||0) > 0).length;
+  const passed = total - flagged;
+  const passRate = total ? Math.round((passed/total)*100) : 0;
+  const vehicles = new Set(filtered.map(i=>i["Vehicle Reg. Details"]).filter(Boolean)).size;
+
+  const failureTally = {};
+  filtered.forEach(i=>{
+    (i["Failed Items"]||"").split(" | ").map(s=>s.trim()).filter(Boolean).forEach(q=>{
+      failureTally[q] = (failureTally[q]||0) + 1;
+    });
+  });
+  const topFailures = Object.entries(failureTally).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const periodLabel = (fromVal||"Start") + " to " + (toVal||"Today");
+
+  const reportHtml = `
+    <div class="pr-page">
+      <div class="pr-topbar">
+        <div class="pr-brand">
+          <div class="pr-company">Al Ghurair Infrastructure</div>
+          <div class="pr-division">Facilities Solutions</div>
+        </div>
+        <div class="pr-titlebox"><h1>Monthly Inspection Summary</h1></div>
+        <div class="pr-logobox">Logo Area</div>
+      </div>
+      <div class="pr-bar3">
+        <div><span class="pr-lbl">Period</span><span class="pr-val">${periodLabel}</span></div>
+        <div><span class="pr-lbl">Generated</span><span class="pr-val">${new Date().toLocaleDateString()}</span></div>
+      </div>
+
+      <table class="pr-info2" style="margin-top:8px;">
+        <tr><th colspan="2">Summary</th></tr>
+        <tr><td class="pr-k">Total Inspections</td><td>${total}</td></tr>
+        <tr><td class="pr-k">Passed</td><td>${passed}</td></tr>
+        <tr><td class="pr-k">Flagged</td><td>${flagged}</td></tr>
+        <tr><td class="pr-k">Pass Rate</td><td>${passRate}%</td></tr>
+        <tr><td class="pr-k">Vehicles Covered</td><td>${vehicles}</td></tr>
+      </table>
+
+      <div class="pr-section-head" style="margin-top:10px;">Top 5 Failure Points</div>
+      <table class="pr-check">
+        <tr><th class="pr-sr">#</th><th class="pr-pts">Issue</th><th style="width:16%;">Occurrences</th></tr>
+        ${topFailures.length ? topFailures.map((f,i)=>`
+          <tr><td class="pr-sr">${i+1}</td><td class="pr-pts">${f[0]}</td><td style="text-align:center;">${f[1]}</td></tr>
+        `).join("") : `<tr><td colspan="3" style="text-align:center;padding:10px;">No failures recorded in this period.</td></tr>`}
+      </table>
+
+      <div class="pr-footer">
+        <span>AGFS-QHSE-F-027</span>
+        <span>Monthly Vehicle Inspection Summary</span>
+        <span>Page 1 of 1</span>
+      </div>
+    </div>
+  `;
+
+  const area = document.getElementById("printReportArea");
+  area.innerHTML = reportHtml;
+  generatePdfFile(area, { "Vehicle Reg. Details": "Monthly_Summary", "Date": (fromVal||"AllTime") });
 }
 
 function setFilter(f){
