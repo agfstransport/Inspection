@@ -523,8 +523,8 @@ function loadFleetAndDrivers(){
 // Passenger vehicle = seats people (Seater/Saloon categories) — excludes
 // pickups, panel vans, and other cargo/utility vehicles from Fleet Master.
 function isPassengerVehicle(record){
-  const cat = (record.category || "").toLowerCase();
-  return cat.includes("seater") || cat.includes("saloon");
+  const util = (record.utilization || "").toLowerCase();
+  return util.includes("passenger");
 }
 
 function initVehicleCombo(){
