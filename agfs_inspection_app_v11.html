@@ -380,7 +380,7 @@ tr.pr-fail td{ background:#FBEAE8; }
   <div class="wizard-nav">
     <button id="backBtn" onclick="wizardBack()">Back</button>
     <button id="nextBtn" class="primary" onclick="wizardNext()">Next</button>
-    <button id="submitBtn" class="submit hidden" onclick="submitInspection()">Submit Inspection</button>
+    <button id="submitBtn" class="submit hidden" onclick="submitInspection()">Submit for Review and Approval</button>
   </div>
   <div id="postSubmitActions" class="wizard-nav hidden">
     <button onclick="downloadInspectionPDF()" class="submit">⬇ Download PDF</button>
@@ -1361,7 +1361,7 @@ function renderDetail(s, items){
     <div class="review-row"><span class="k">Overall Condition</span><span class="v">${s["Overall Condition"]||"—"}</span></div>
     <div class="review-row"><span class="k">Items Flagged</span><span class="v">${s["Fail Count"]||0}</span></div>
     <div class="review-row"><span class="k">Inspected By</span><span class="v">${s["Inspected By"]||"—"}</span></div>
-    <div class="review-row"><span class="k">Reviewed By</span><span class="v">${s["Reviewed By"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Reviewed By</span><span class="v">${s["Approved By"] || s["Reviewed By"] || "—"}</span></div>
     ${s["Comment"] ? `<div class="review-row"><span class="k">Comment</span><span class="v">${s["Comment"]}</span></div>` : ""}
   `;
   const photoLinks = [1,2,3,4].map(n=>s["Photo "+n]).filter(Boolean);
@@ -1543,7 +1543,7 @@ function downloadInspectionPDF(){
 
       <table class="pr-info2" style="margin-top:2px;">
         <tr><th>Inspected By</th><th>Reviewed By</th></tr>
-        <tr><td class="pr-k">Name: ${s["Inspected By"]||"—"}</td><td>Name: ${s["Reviewed By"]||"—"}</td></tr>
+        <tr><td class="pr-k">Name: ${s["Inspected By"]||"—"}</td><td>Name: ${s["Approved By"] || s["Reviewed By"] || "—"}</td></tr>
         <tr><td class="pr-k">Designation:</td><td>Designation:</td></tr>
         <tr><td class="pr-k">Signature &amp; Date:</td><td>Signature &amp; Date:</td></tr>
       </table>
