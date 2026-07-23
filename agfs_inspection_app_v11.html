@@ -1263,6 +1263,7 @@ function renderList(){
           <div class="veh">${i["Vehicle Reg. Details"]||"—"}</div>
           <div class="meta">${dt} &middot; ${i["Site / Location"]||""} &middot; ${i["Driver Details"]||""}</div>
         </div>
+        ${!selectMode ? `<button class="card-dl-btn" title="View Document" onclick="event.stopPropagation(); openDetail('${id}')">📄</button>` : ""}
         ${!selectMode ? `<button class="card-dl-btn" title="Download PDF" onclick="event.stopPropagation(); downloadCardPDF('${id}')">⬇</button>` : ""}
         <span class="${statusBadgeClass}" style="${statusStyle}">${status}</span>
         <span class="badge ${flagged?'bad':'ok'}">${flagged ? (i["Fail Count"]+" flagged") : "Passed"}</span>
@@ -1340,18 +1341,33 @@ function renderDetail(s, items){
       ` : ""}
     </div>
 
+    <div class="section-head">Vehicle Information</div>
+    <div class="review-row"><span class="k">Vehicle Reg.</span><span class="v">${s["Vehicle Reg. Details"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Own / Rental</span><span class="v">${s["Vehicle Owner"]||"—"} ${s["Vehicle Owner (Rented Co.)"]?(" — "+s["Vehicle Owner (Rented Co.)"]):""}</span></div>
+    <div class="review-row"><span class="k">Make</span><span class="v">${s["Make"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Make Year</span><span class="v">${s["Make Year"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Mileage (KM)</span><span class="v">${s["Mileage (KM)"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Category</span><span class="v">${s["Category"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Last PM Date</span><span class="v">${s["Last PM Date"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Renewal Date</span><span class="v">${s["Renewal Date"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Site / Location</span><span class="v">${s["Site / Location"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Emirate / Region</span><span class="v">${s["Emirate / Region"]||"—"}</span></div>
+
+    <div class="section-head" style="margin-top:14px;">Driver Information</div>
+    <div class="review-row"><span class="k">Driver Details</span><span class="v">${s["Driver Details"]||"—"}</span></div>
+    <div class="review-row"><span class="k">Driver Own / Rental</span><span class="v">${s["Driver Owner"]||"—"} ${s["Driver Owner (Rented Co.)"]?(" — "+s["Driver Owner (Rented Co.)"]):""}</span></div>
+
+    <div class="section-head" style="margin-top:14px;">Inspection Summary</div>
     <div class="review-row"><span class="k">Overall Condition</span><span class="v">${s["Overall Condition"]||"—"}</span></div>
     <div class="review-row"><span class="k">Items Flagged</span><span class="v">${s["Fail Count"]||0}</span></div>
     <div class="review-row"><span class="k">Inspected By</span><span class="v">${s["Inspected By"]||"—"}</span></div>
     <div class="review-row"><span class="k">Reviewed By</span><span class="v">${s["Reviewed By"]||"—"}</span></div>
+    ${s["Comment"] ? `<div class="review-row"><span class="k">Comment</span><span class="v">${s["Comment"]}</span></div>` : ""}
   `;
   const photoLinks = [1,2,3,4].map(n=>s["Photo "+n]).filter(Boolean);
   if(photoLinks.length){
     html += `<div class="section-head">Photos</div><div class="photo-links">` +
       photoLinks.map((u,i)=>`<a href="${u}" target="_blank">Photo ${i+1}</a>`).join("") + `</div>`;
-  }
-  if(s["Comment"]){
-    html += `<div class="section-head">Comment</div><div style="font-size:13px;">${s["Comment"]}</div>`;
   }
 
   ["Vehicle","Driver","Passenger"].forEach(section=>{
