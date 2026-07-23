@@ -206,9 +206,24 @@ tr.pr-fail td{ background:#FBEAE8; }
     <div class="title">AGFS Vehicle Inspection</div>
     <div class="sub">Fleet & Transport Operations</div>
   </div>
-  <div id="connStatus" style="display:flex; align-items:center; gap:6px; font-size:11px; color:#B6BCC6;">
-    <span id="connDot" style="width:8px; height:8px; border-radius:50%; background:#888; display:inline-block;"></span>
-    <span id="connLabel">Checking...</span>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div id="managerAuthWidget" style="font-size:11px; color:#B6BCC6; cursor:pointer;" onclick="openLoginModal()">👤 Manager Login</div>
+    <div id="connStatus" style="display:flex; align-items:center; gap:6px; font-size:11px; color:#B6BCC6;">
+      <span id="connDot" style="width:8px; height:8px; border-radius:50%; background:#888; display:inline-block;"></span>
+      <span id="connLabel">Checking...</span>
+    </div>
+  </div>
+</div>
+
+<!-- Manager login modal -->
+<div class="modal-overlay hidden" id="loginModal">
+  <div class="modal-sheet" style="max-width:360px; margin:auto;">
+    <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+    <h2 style="margin:4px 0 14px;">Manager Login</h2>
+    <div class="field"><label>Employee ID</label><input type="text" id="loginId" autocomplete="off"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="off"></div>
+    <div id="loginError" style="color:var(--fail); font-size:12.5px; margin-bottom:8px;"></div>
+    <button class="newbtn" style="margin-bottom:0;" onclick="submitLogin()">Login</button>
   </div>
 </div>
 
@@ -242,6 +257,7 @@ tr.pr-fail td{ background:#FBEAE8; }
     <div class="chip active" data-f="all" onclick="setFilter('all')">All</div>
     <div class="chip" data-f="flagged" onclick="setFilter('flagged')">Flagged</div>
     <div class="chip" data-f="ok" onclick="setFilter('ok')">Passed</div>
+    <div class="chip" data-f="pending" onclick="setFilter('pending')">Pending Approval</div>
     <div class="chip" id="selectModeChip" onclick="toggleSelectMode()" style="margin-left:auto;">Select</div>
   </div>
   <div id="deleteBar" class="filters hidden" style="justify-content:space-between; align-items:center;">
@@ -888,7 +904,7 @@ function submitInspection(){
 
 function buildLocalSummary(fd, failCount, submissionId){
   return {
-    "Submission ID": submissionId || "",
+    "Submission ID": submissionId || "", "Approval Status": "Pending",
     "Site / Location": fd.site_loc, "Emirate / Region": fd.region, "Date": fd.date_today,
     "Vehicle Reg. Details": fd.veh_reg, "Vehicle Owner": fd.radio_veh_b, "Vehicle Owner (Rented Co.)": fd.veh_b_txt,
     "Driver Details": fd.drv_det, "Driver Owner": fd.radio_drv_b,
@@ -1214,6 +1230,7 @@ function renderList(){
   let list = allInspections.filter(i=>{
     if(currentFilter==="flagged" && !((i["Fail Count"]||0)>0)) return false;
     if(currentFilter==="ok" && (i["Fail Count"]||0)>0) return false;
+    if(currentFilter==="pending" && (i["Approval Status"]||"Pending") !== "Pending") return false;
     if(search){
       const hay = [i["Vehicle Reg. Details"], i["Driver Details"], i["Site / Location"]].join(" ").toLowerCase();
       if(!hay.includes(search)) return false;
@@ -1236,6 +1253,9 @@ function renderList(){
     const id = i["Submission ID"];
     const checked = selectedIds.has(id);
     const clickAction = selectMode ? `toggleCardSelect('${id}')` : `openDetail('${id}')`;
+    const status = i["Approval Status"] || "Pending";
+    const statusBadgeClass = status === "Approved" ? "badge ok" : (status === "Rejected" ? "badge bad" : "badge");
+    const statusStyle = status === "Pending" ? "background:#FEF3E0; color:#B97A0A;" : "";
     return `
       <div class="insp-card" onclick="${clickAction}">
         ${selectMode ? `<input type="checkbox" onclick="event.stopPropagation(); toggleCardSelect('${id}')" ${checked?'checked':''} style="width:18px;height:18px;flex-shrink:0;">` : ""}
@@ -1244,6 +1264,7 @@ function renderList(){
           <div class="meta">${dt} &middot; ${i["Site / Location"]||""} &middot; ${i["Driver Details"]||""}</div>
         </div>
         ${!selectMode ? `<button class="card-dl-btn" title="Download PDF" onclick="event.stopPropagation(); downloadCardPDF('${id}')">⬇</button>` : ""}
+        <span class="${statusBadgeClass}" style="${statusStyle}">${status}</span>
         <span class="badge ${flagged?'bad':'ok'}">${flagged ? (i["Fail Count"]+" flagged") : "Passed"}</span>
       </div>
     `;
@@ -1296,14 +1317,29 @@ function openDetail(id){
 function closeDetail(){ document.getElementById("detailModal").classList.add("hidden"); }
 
 function renderDetail(s, items){
+  const status = s["Approval Status"] || "Pending";
+  const statusColor = status === "Approved" ? "var(--pass)" : (status === "Rejected" ? "var(--fail)" : "#B97A0A");
+  const statusBg = status === "Approved" ? "var(--pass-bg)" : (status === "Rejected" ? "var(--fail-bg)" : "#FEF3E0");
+
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
       <h2 style="margin:4px 0 2px;">${s["Vehicle Reg. Details"]||"—"}</h2>
       <button onclick="downloadInspectionPDF()" style="border:1px solid var(--line); background:var(--ink); color:#fff; border-radius:6px; padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">⬇ Download PDF</button>
     </div>
-    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;">
+    <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;">
       ${s["Date"]||""} &middot; ${s["Site / Location"]||""} &middot; ${s["Driver Details"]||""}
     </div>
+
+    <div style="background:${statusBg}; color:${statusColor}; border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:13px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <span>Approval Status: ${status}${s["Approved By"] ? (" — by " + s["Approved By"]) : ""}</span>
+      ${status === "Pending" ? `
+        <span style="display:flex; gap:6px;">
+          <button onclick="setApprovalStatus('${s["Submission ID"]}','Approved')" style="background:var(--pass); color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer;">✓ Approve</button>
+          <button onclick="setApprovalStatus('${s["Submission ID"]}','Rejected')" style="background:var(--fail); color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer;">✗ Reject</button>
+        </span>
+      ` : ""}
+    </div>
+
     <div class="review-row"><span class="k">Overall Condition</span><span class="v">${s["Overall Condition"]||"—"}</span></div>
     <div class="review-row"><span class="k">Items Flagged</span><span class="v">${s["Fail Count"]||0}</span></div>
     <div class="review-row"><span class="k">Inspected By</span><span class="v">${s["Inspected By"]||"—"}</span></div>
@@ -1331,6 +1367,78 @@ function renderDetail(s, items){
   });
 
   document.getElementById("detailContent").innerHTML = html;
+}
+
+/* ============= MANAGER LOGIN ============= */
+let loggedInManager = null; // { id, name, role, password } — kept in memory only, cleared on page reload
+
+function openLoginModal(){
+  if(loggedInManager){
+    if(confirm(`Logged in as ${loggedInManager.name} (${loggedInManager.role}). Log out?`)){
+      loggedInManager = null;
+      updateAuthWidget();
+    }
+    return;
+  }
+  document.getElementById("loginId").value = "";
+  document.getElementById("loginPassword").value = "";
+  document.getElementById("loginError").textContent = "";
+  document.getElementById("loginModal").classList.remove("hidden");
+}
+function closeLoginModal(){
+  document.getElementById("loginModal").classList.add("hidden");
+}
+
+function submitLogin(){
+  const id = document.getElementById("loginId").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  if(!id || !password){ errEl.textContent = "Enter both ID and password."; return; }
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "login", id: id, password: password })
+  }).then(r=>r.json()).then(data=>{
+    if(data && data.result === "success"){
+      loggedInManager = { id: id, password: password, name: data.name, role: data.role };
+      updateAuthWidget();
+      closeLoginModal();
+    } else {
+      errEl.textContent = (data && data.message) ? data.message : "Login failed.";
+    }
+  }).catch(()=>{ errEl.textContent = "Could not reach Google Sheets."; });
+}
+
+function updateAuthWidget(){
+  const el = document.getElementById("managerAuthWidget");
+  el.textContent = loggedInManager ? `👤 ${loggedInManager.name} (${loggedInManager.role}) — Logout` : "👤 Manager Login";
+}
+
+function setApprovalStatus(id, status){
+  if(!loggedInManager){
+    alert("Manager login required to approve or reject inspections.");
+    openLoginModal();
+    return;
+  }
+  if(!confirm(`${status === "Approved" ? "Approve" : "Reject"} this inspection as ${loggedInManager.name}?`)) return;
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "update_status", id: id, status: status,
+      managerId: loggedInManager.id, managerPassword: loggedInManager.password
+    })
+  }).then(r=>r.json()).then(data=>{
+    if(data && data.result === "success"){
+      openDetail(id); // refresh the detail view with the new status
+      loadInspections(); // refresh the dashboard list in the background
+    } else {
+      alert("Could not update status: " + (data && data.message ? data.message : "unknown error"));
+    }
+  }).catch(()=> alert("Could not reach Google Sheets."));
 }
 
 /* ============= PDF REPORT (single inspection) — matches AGFS-QHSE form layout ============= */
