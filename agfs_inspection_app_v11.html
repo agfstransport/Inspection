@@ -141,8 +141,9 @@ body{margin:0;background:var(--paper);font-family:var(--font);color:var(--ink);p
 .pr-topbar .pr-brand{ flex:1.4; padding:4px 8px; border-right:1px solid #333; }
 .pr-topbar .pr-brand .pr-company{ color:#8B1A2B; font-weight:800; font-size:11px; }
 .pr-topbar .pr-brand .pr-division{ color:#555; font-size:8px; font-style:italic; }
-.pr-topbar .pr-titlebox{ flex:2.4; display:flex; align-items:center; justify-content:center; border-right:1px solid #333; }
+.pr-topbar .pr-titlebox{ flex:2.4; display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid #333; }
 .pr-topbar .pr-titlebox h1{ font-size:14px; margin:0; }
+.pr-topbar .pr-titlebox .pr-idline{ font-size:8px; font-weight:700; color:var(--pr-purple); margin-top:2px; }
 .pr-topbar .pr-logobox{ flex:1.4; display:flex; align-items:center; justify-content:center; color:#999; font-size:8px; font-style:italic; }
 
 .pr-bar3{ display:flex; background:var(--pr-purple); color:#fff; border:1px solid #333; border-top:none; font-size:8.5px; }
@@ -1375,7 +1376,7 @@ function downloadInspectionPDF(){
           <div class="pr-company">Al Ghurair Infrastructure</div>
           <div class="pr-division">Facilities Solutions</div>
         </div>
-        <div class="pr-titlebox"><h1>Vehicle Inspection Checklist</h1></div>
+        <div class="pr-titlebox"><h1>Vehicle Inspection Checklist</h1><div class="pr-idline">${s["Submission ID"] || "—"}</div></div>
         <div class="pr-logobox">Logo Area</div>
       </div>
 
@@ -1383,10 +1384,6 @@ function downloadInspectionPDF(){
         <div><span class="pr-lbl">Site / Location</span><span class="pr-val">${s["Site / Location"]||"&nbsp;"}</span></div>
         <div><span class="pr-lbl">Emirates / region</span><span class="pr-val">${s["Emirate / Region"]||"&nbsp;"}</span></div>
         <div><span class="pr-lbl">Date</span><span class="pr-val">${s["Date"]||"&nbsp;"}</span></div>
-      </div>
-
-      <div style="text-align:right; font-size:9px; font-weight:800; color:var(--pr-purple); margin:4px 0 2px;">
-        Inspection ID: ${s["Submission ID"] || "—"}
       </div>
 
       <table class="pr-info2">
@@ -1428,7 +1425,7 @@ function downloadInspectionPDF(){
       </table>
 
       <div class="pr-footer">
-        <span>${s["Submission ID"]||"—"}</span>
+        <span>AGFS-QHSE-F-027 - Rev 01 - 09-07-2025</span>
         <span>Vehicle Inspection Checklist – QHSE</span>
         <span>Page 1 of 1</span>
       </div>
