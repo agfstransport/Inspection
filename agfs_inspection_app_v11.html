@@ -1385,6 +1385,10 @@ function downloadInspectionPDF(){
         <div><span class="pr-lbl">Date</span><span class="pr-val">${s["Date"]||"&nbsp;"}</span></div>
       </div>
 
+      <div style="text-align:right; font-size:9px; font-weight:800; color:var(--pr-purple); margin:4px 0 2px;">
+        Inspection ID: ${s["Submission ID"] || "—"}
+      </div>
+
       <table class="pr-info2">
         <tr><th>Vehicle Information</th><th>Details</th></tr>
         <tr><td class="pr-k">a) Vehicle belongs to AGFS or rented?</td><td>${s["Vehicle Owner"]||"—"} ${s["Vehicle Owner (Rented Co.)"]?(" — "+s["Vehicle Owner (Rented Co.)"]):""}</td></tr>
