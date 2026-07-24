@@ -1547,7 +1547,7 @@ function downloadInspectionPDF(){
         <tr><th>Inspected By</th><th>Reviewed By</th></tr>
         <tr><td class="pr-k">Name: ${s["Inspected By"]||"—"}</td><td>Name: ${s["Approved By"] || s["Reviewed By"] || "—"}</td></tr>
         <tr><td class="pr-k">Designation:</td><td>Designation:</td></tr>
-        <tr><td class="pr-k">Signature &amp; Date:</td><td>Signature &amp; Date:</td></tr>
+        <tr><td class="pr-k">Date: ${s["Date"] || "—"}</td><td>Date: ${(s["Approval Date"]||"").slice(0,10) || s["Date"] || "—"}</td></tr>
       </table>
 
       <div class="pr-footer">
