@@ -229,7 +229,6 @@ tr.pr-fail td{ background:#FBEAE8; }
 
 <div class="tabbar">
   <div class="tab active" id="tabDashboard" onclick="showView('dashboard')">Dashboard <span id="tabCountBadge" class="tab-badge"></span></div>
-  <div class="tab" id="tabOverdue" onclick="showView('overdue')">Overdue <span id="overdueCountBadge" class="tab-badge" style="background:var(--fail);"></span></div>
   <div class="tab" id="tabWizard" onclick="showView('wizard')">New Inspection</div>
 </div>
 
@@ -270,21 +269,6 @@ tr.pr-fail td{ background:#FBEAE8; }
   </div>
   <div id="statusLine" class="status-msg"></div>
   <div id="listContainer"></div>
-</div>
-
-<!-- ============= OVERDUE VEHICLES ============= -->
-<div class="wrap hidden" id="overdueView">
-  <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">
-    <div class="kpi"><div class="num" id="kpiOverdueTotal" style="color:var(--fail);">0</div><div class="lbl">Overdue (30+ days)</div></div>
-    <div class="kpi"><div class="num" id="kpiNeverInspected" style="color:var(--fail);">0</div><div class="lbl">Never Inspected</div></div>
-    <div class="kpi"><div class="num" id="kpiFleetTotal">0</div><div class="lbl">Passenger Fleet</div></div>
-  </div>
-  <div class="filters">
-    <input type="text" id="overdueSearchBox" placeholder="Search plate..." oninput="renderOverdueList()">
-  </div>
-  <button class="chip" style="width:100%; padding:8px; margin-bottom:10px;" onclick="loadOverdueVehicles()">🔄 Refresh</button>
-  <div id="overdueStatusLine" class="status-msg"></div>
-  <div id="overdueListContainer"></div>
 </div>
 
 <!-- ============= WIZARD ============= -->
@@ -692,16 +676,10 @@ function renderComboList(listEl, items, renderFn, onSelect){
 
 function showView(view){
   document.getElementById("dashboardView").classList.toggle("hidden", view!=="dashboard");
-  document.getElementById("overdueView").classList.toggle("hidden", view!=="overdue");
   document.getElementById("wizardView").classList.toggle("hidden", view!=="wizard");
   document.getElementById("tabDashboard").classList.toggle("active", view==="dashboard");
-  document.getElementById("tabOverdue").classList.toggle("active", view==="overdue");
   document.getElementById("tabWizard").classList.toggle("active", view==="wizard");
   if(view==="dashboard") loadInspections();
-  if(view==="overdue"){
-    if(allInspections.length && fleetRecords.length) computeOverdue();
-    else loadOverdueVehicles();
-  }
   if(view==="wizard"){
     document.getElementById("postSubmitActions").classList.add("hidden");
     renderStep();
@@ -1000,103 +978,6 @@ function renderKPIs(){
   document.getElementById("kpiVehicles").textContent = vehicles;
   const badge = document.getElementById("tabCountBadge");
   if(badge) badge.textContent = total;
-}
-
-/* ============= OVERDUE VEHICLES ============= */
-let overdueVehiclesData = [];
-
-function loadOverdueVehicles(){
-  document.getElementById("overdueStatusLine").style.color = "#555";
-  document.getElementById("overdueStatusLine").textContent = "Loading (Fleet Master has ~478 vehicles, this can take up to 20 seconds)...";
-
-  Promise.allSettled([
-    fetchWithTimeout(SCRIPT_URL + "?action=list", 20000).then(r=>r.json()),
-    fetchWithTimeout(FLEET_SCRIPT_URL + "?action=records", 20000).then(r=>r.json())
-  ]).then(([inspResult, fleetResult])=>{
-    const problems = [];
-    if(inspResult.status !== "fulfilled") problems.push("Inspections list: " + inspResult.reason.message);
-    else if(!inspResult.value || inspResult.value.result !== "success") problems.push("Inspections list: " + (inspResult.value && inspResult.value.message ? inspResult.value.message : "unexpected response"));
-
-    if(fleetResult.status !== "fulfilled") problems.push("Fleet Master: " + fleetResult.reason.message);
-    else if(!fleetResult.value || !fleetResult.value.ok) problems.push("Fleet Master: " + (fleetResult.value && fleetResult.value.error ? fleetResult.value.error : "unexpected response"));
-
-    if(problems.length){
-      document.getElementById("overdueStatusLine").style.color = "#C0392B";
-      document.getElementById("overdueStatusLine").textContent = "Could not load data — " + problems.join(" | ");
-      return;
-    }
-
-    allInspections = inspResult.value.inspections || [];
-    fleetRecords = fleetResult.value.data || [];
-
-    try{
-      computeOverdue();
-    } catch(err){
-      document.getElementById("overdueStatusLine").style.color = "#C0392B";
-      document.getElementById("overdueStatusLine").textContent = "Error while processing data: " + err.message;
-    }
-  });
-}
-
-function computeOverdue(){
-  const lastInspectionByPlate = {};
-  allInspections.forEach(i=>{
-    const plate = String(i["Vehicle Reg. Details"]||"").trim().toUpperCase();
-    if(!plate) return;
-    const d = new Date(i["Date"] || i["Timestamp"] || "");
-    if(isNaN(d)) return;
-    if(!lastInspectionByPlate[plate] || d > lastInspectionByPlate[plate]) lastInspectionByPlate[plate] = d;
-  });
-
-  const now = new Date();
-  const MS_PER_DAY = 24*60*60*1000;
-
-  overdueVehiclesData = fleetRecords.filter(isPassengerVehicle).map(v=>{
-    const plate = String(v.plate||"").trim().toUpperCase();
-    const lastDate = lastInspectionByPlate[plate];
-    const daysSince = lastDate ? Math.floor((now - lastDate)/MS_PER_DAY) : null;
-    return {
-      plate: String(v.plate || "—"), make: v.make || "", region: v.region || "",
-      daysSince: daysSince, overdue: (daysSince === null) || daysSince > 30
-    };
-  }).filter(v => v.overdue)
-    .sort((a,b)=> (a.daysSince===null?9999:a.daysSince) < (b.daysSince===null?9999:b.daysSince) ? 1 : -1);
-
-  document.getElementById("overdueStatusLine").textContent = "";
-  renderOverdueKPIs();
-  renderOverdueList();
-}
-
-function renderOverdueKPIs(){
-  const neverCount = overdueVehiclesData.filter(v=>v.daysSince===null).length;
-  document.getElementById("kpiOverdueTotal").textContent = overdueVehiclesData.length;
-  document.getElementById("kpiNeverInspected").textContent = neverCount;
-  document.getElementById("kpiFleetTotal").textContent = fleetRecords.filter(isPassengerVehicle).length;
-
-  const badge = document.getElementById("overdueCountBadge");
-  if(badge) badge.textContent = overdueVehiclesData.length || "";
-}
-
-function renderOverdueList(){
-  const search = document.getElementById("overdueSearchBox").value.toLowerCase();
-  const list = overdueVehiclesData.filter(v => !search || v.plate.toLowerCase().includes(search));
-  const container = document.getElementById("overdueListContainer");
-  if(!list.length){
-    container.innerHTML = `<div class="empty-state">No overdue vehicles — everything's up to date.</div>`;
-    return;
-  }
-  container.innerHTML = list.map(v=>{
-    const lastText = v.daysSince===null ? "Never inspected" : (v.daysSince + " days ago");
-    return `
-      <div class="insp-card" style="cursor:default;">
-        <div class="left">
-          <div class="veh">${v.plate}</div>
-          <div class="meta">${v.make||""} ${v.region?("&middot; "+v.region):""}</div>
-        </div>
-        <span class="badge bad">${lastText}</span>
-      </div>
-    `;
-  }).join("");
 }
 
 /* ============= MONTHLY SUMMARY REPORT ============= */
